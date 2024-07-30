@@ -1,0 +1,77 @@
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch
+*.pth
+*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Data files (uncomment if you don't want to track data files)
+# *.csv
+# *.json
+# *.pkl
+
+# Model checkpoints (uncomment if you don't want to track checkpoints)
+# checkpoints/
+
+# Temporary files
+*.swp
+*.swo
+*~
+
+# Tensorboard logs
+runs/
+
+# Hydra outputs
+outputs/
+multirun/
+
+# Weights and Biases
+wandb/
+
+# Project-specific folders (add any custom folders you want to ignore)
+# data/
+# results/
