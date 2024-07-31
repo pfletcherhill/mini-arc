@@ -1,6 +1,8 @@
 import copy
 import random
 
+# TODO: update this file to handle many other patterns and sizes
+
 
 def generate_grid():
     return [[0 for _ in range(10)] for _ in range(10)]

@@ -44,34 +44,41 @@ def pad_and_mask_grid(
 
 
 class ARCDataset(Dataset):
-    challenges_file: str
-    solutions_file: str
+    challenges: dict
+    solutions: dict
+    # challenges_file: str
+    # solutions_file: str
     task_ids: list[str]
     config: ARCDatasetConfig
 
     def __init__(
         self, challenges_file: str, solutions_file: str, config: ARCDatasetConfig
     ):
-        self.challenges_file = challenges_file
-        self.solutions_file = solutions_file
+        # self.challenges_file = challenges_file
+        # self.solutions_file = solutions_file
         with open(challenges_file, "r") as f:
-            challenges = json.load(f)
-            self.task_ids = list(challenges.keys())
+            self.challenges = json.load(f)
+            self.task_ids = list(self.challenges.keys())
+        with open(solutions_file, "r") as f:
+            self.solutions = json.load(f)
         self.config = config
 
     def __len__(self):
         return len(self.task_ids)
+        # return len(self.challenges.keys())
 
     def __getitem__(self, idx) -> dict:
         task_id = self.task_ids[idx]
-        challenge = get_task_from_file(self.challenges_file, task_id)
-        solution = get_task_from_file(self.solutions_file, task_id)
+        # challenge = get_task_from_file(self.challenges_file, task_id)
+        challenge = self.challenges[task_id]
+        # solution = get_task_from_file(self.solutions_file, task_id)
+        solution = self.solutions[task_id]
 
         grids = torch.zeros(
             2 * self.config.max_train_grids + 1,
             self.config.max_grid_size,
             self.config.max_grid_size,
-            dtype=torch.long,
+            dtype=torch.int,
         )
         masks = torch.zeros(
             2 * self.config.max_train_grids + 1,
