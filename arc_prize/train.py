@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from arc_prize.data import ARCDataset
-from arc_prize.env import modal_app
+from arc_prize.env import modal_app, modal_volume
 from arc_prize.model import ARCTransformer
 
 
@@ -42,22 +42,31 @@ def unmasked_cross_entropy_loss(predictions: torch.Tensor, targets: torch.Tensor
     predictions = predictions.contiguous().view(B * H * W, C)
     targets = targets.long().contiguous().view(B * H * W)
 
+    print("Predictions shape:", predictions.shape)
+    print("Targets shape:", targets.shape)
+    print("Unique target values:", torch.unique(targets))
+    print("Predictions min/max:", predictions.min().item(), predictions.max().item())
+
     loss = nn.CrossEntropyLoss()(predictions, targets)
     return loss
 
 
-@modal_app.function(gpu="t4")
-def train_arc_transformer(
+@modal_app.function(gpu="t4", volumes={"/vol/models": modal_volume})
+def train_arc_transformer_encoder(
     model: ARCTransformer,
     train_loader: DataLoader[ARCDataset],
     val_loader: DataLoader[ARCDataset],
     num_epochs: int,
     learning_rate: float,
+    weight_decay: float,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(
+        model.parameters(), lr=learning_rate, weight_decay=weight_decay
+    )
 
     history = {"train_loss": [], "val_loss": []}
 
@@ -110,6 +119,122 @@ def train_arc_transformer(
 
     model_file_name = f"tmp_model_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}.pth"
     print(model_file_name)
-    torch.save(model.state_dict(), model_file_name)
+    torch.save(model.state_dict(), f"/vol/models/{model_file_name}")
 
     return model, history
+
+
+def train_arc_transformer(
+    model: ARCTransformer,
+    train_loader: DataLoader[ARCDataset],
+    val_loader: DataLoader[ARCDataset],
+    num_epochs: int,
+    learning_rate: float,
+    weight_decay: float,
+):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    model_file_name = f"model_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}.pth"
+
+    # Loss function and optimizer
+    class_weights = torch.ones(model.num_classes).to(device)
+    class_weights[0] = 0.1
+    class_weights[1] = 0.4
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=learning_rate,
+        weight_decay=weight_decay,
+    )
+
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=5, verbose=True
+    )
+
+    best_val_loss = float("inf")
+    for epoch in range(num_epochs):
+        model.train()
+        train_loss = 0.0
+        train_accuracy = 0.0
+
+        for batch in train_loader:
+            # grids, masks, target_grid = batch
+            grids, masks, target_grid = [item.to(device) for item in batch]
+
+            optimizer.zero_grad()
+            output = model(grids, masks)
+
+            num_classes = output.shape[-1]
+            loss = criterion(output.view(-1, num_classes), target_grid.view(-1).long())
+            loss.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+            optimizer.step()
+
+            train_loss += loss.item()
+
+            # Calculate accuracy
+            predictions = torch.argmax(output, dim=-1)
+            train_accuracy += (predictions == target_grid).float().mean().item()
+
+        train_loss /= len(train_loader)
+        train_accuracy /= len(train_loader)
+
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        val_accuracy = 0.0
+        with torch.no_grad():
+            for batch in val_loader:
+                # grids, masks, target_grid = batch
+                grids, masks, target_grid = [item.to(device) for item in batch]
+
+                output = model(grids, masks)
+                num_classes = output.shape[-1]
+                loss = criterion(
+                    output.view(-1, num_classes), target_grid.view(-1).long()
+                )
+
+                val_loss += loss.item()
+
+                predictions = torch.argmax(output, dim=-1)
+                val_accuracy += (predictions == target_grid).float().mean().item()
+
+        val_loss /= len(val_loader)
+        val_accuracy /= len(val_loader)
+
+        # Learning rate scheduling
+        scheduler.step(val_loss)
+
+        print(f"Epoch {epoch+1}/{num_epochs}:")
+        print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
+        print(f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
+
+        # Save the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), f"/vol/models/{model_file_name}")
+            print("Saved new best model", model_file_name)
+
+    print("Training completed")
+    return model
+
+
+@modal_app.function(gpu="t4", volumes={"/vol/models": modal_volume})
+def train_on_modal(
+    model: ARCTransformer,
+    train_loader: DataLoader[ARCDataset],
+    val_loader: DataLoader[ARCDataset],
+    num_epochs: int,
+    learning_rate: float,
+    weight_decay: float,
+):
+    return (
+        train_arc_transformer(
+            model, train_loader, val_loader, num_epochs, learning_rate, weight_decay
+        ),
+    )

@@ -2,6 +2,8 @@ from typing import Optional
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 import torch
 
 COLORS = [
@@ -29,29 +31,25 @@ def visualize_grids(
     cmap = mcolors.ListedColormap(COLORS)
 
     num_rows = len(train_grids) + 1
+    num_cols = 4
 
-    fig, axes = plt.subplots(num_rows, 2, figsize=(8, 4 * num_rows))
-
-    # Ensure axes is always 2D, even with only one row
-    if num_rows == 1:
-        axes = axes.reshape(1, 2)
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(8, 4 * num_rows))
 
     # Plot training pairs
     for i, pair in enumerate(train_grids):
-        axes[i, 0].imshow(pair["input"], cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-        axes[i, 1].imshow(pair["output"], cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+        row = (i * 2) // num_cols
+        col = (i * 2) % num_cols
+        axes[row, col].imshow(pair["input"], cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+        axes[row, col + 1].imshow(
+            pair["output"], cmap=cmap, vmin=0, vmax=len(COLORS) - 1
+        )
 
-        axes[i, 0].axis("off")
-        axes[i, 1].axis("off")
-
-        if i == 0:
-            axes[i, 0].set_title("Input")
-            axes[i, 1].set_title("Output")
+        axes[row,].axis("off")
 
     # Plot test input grid
-    axes[-1, 0].imshow(input_grid, cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    axes[-1, 0].axis("off")
-    axes[-1, 0].set_title("Test Input")
+    axes[num_rows - 1, 0].imshow(input_grid, cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+    axes[num_rows - 1,].axis("off")
+    axes[num_rows - 1, 0].set_title("Test Input")
 
     # Plot test output grid if provided
     if output_grid is not None:
@@ -66,12 +64,18 @@ def visualize_grids(
     plt.show()
 
 
+def visualize_mask(mask, title):
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(mask.cpu().numpy(), cmap="YlGnBu", cbar=True)
+    plt.title(title)
+    plt.show()
+
+
 def visualize_tensors(
     grids: torch.Tensor,
     output_grid: torch.Tensor,
     prediction: torch.Tensor,
 ):
-    print("SHAPES", grids.shape, output_grid.shape, prediction.shape)
     # Create a colormap from the list of colors
     cmap = mcolors.ListedColormap(COLORS)
 
@@ -79,46 +83,55 @@ def visualize_tensors(
     num_pairs = (grids.shape[0] - 1) // 2  # Subtract 1 for the test input
 
     # Calculate the number of rows needed
-    num_rows = num_pairs + 1  # +1 for the test row
+    num_cols = 4
+    num_rows = (num_pairs // (num_cols // 2)) + 1  # +1 for the test row
 
     # Create a figure with the appropriate number of subplots
-    fig, axes = plt.subplots(num_rows, 3, figsize=(8, 4 * num_rows))
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(3 * num_cols, 3 * num_rows))
 
-    # Ensure axes is always 2D, even with only one row
-    if num_rows == 1:
-        axes = axes.reshape(1, 2)
+    def plot_grid(ax, grid):
+        ax.imshow(grid.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+        ax.set_xticks(np.arange(-0.5, grid.shape[1], 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, grid.shape[0], 1), minor=True)
+        ax.grid(which="minor", color="lightgrey", linestyle="-", linewidth=0.5)
+        ax.tick_params(
+            which="both", bottom=False, left=False, labelbottom=False, labelleft=False
+        )
 
     # Plot input/output training pairs
     for i in range(num_pairs):
-        axes[i, 0].imshow(grids[2 * i].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-        axes[i, 1].imshow(
-            grids[2 * i + 1].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1
-        )
+        row = (i * 2) // num_cols
+        col = (i * 2) % num_cols
 
-        axes[i, 0].axis("off")
-        axes[i, 1].axis("off")
+        plot_grid(axes[row, col], grids[2 * i])
+        plot_grid(axes[row, col + 1], grids[2 * i + 1])
+        # axes[row, col].imshow(
+        #     grids[2 * i].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1
+        # )
+        # axes[row, col + 1].imshow(
+        #     grids[2 * i + 1].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1
+        # )
 
         if i == 0:
-            axes[i, 0].set_title("Input")
-            axes[i, 1].set_title("Output")
+            axes[row, 0].set_title("Input")
+            axes[row, 1].set_title("Output")
 
     # Plot test input grid
-    axes[-1, 0].imshow(grids[-1].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    axes[-1, 0].axis("off")
+    plot_grid(axes[-1, 0], grids[-1])
+    # axes[-1, 0].imshow(grids[-1].cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
     axes[-1, 0].set_title("Test Input")
 
     # Plot test output grid and prediction side by side
-    test_output_ax = axes[-1, 1]
-    test_output_ax.imshow(output_grid.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    test_output_ax.axis("off")
-    test_output_ax.set_title("Expected Output")
+
+    # test_output_ax.imshow(output_grid.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+    plot_grid(axes[-1, 1], output_grid)
+    axes[-1, 1].set_title("Expected Output")
 
     # Add prediction as a small subplot
     # pred_ax = fig.add_axes([0.75, 0.125, 0.2, 0.2])  # [left, bottom, width, height]
-    pred_ax = axes[-1, 2]
-    pred_ax.imshow(prediction.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    pred_ax.axis("off")
-    pred_ax.set_title("Prediction")
+    # pred_ax.imshow(prediction.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
+    plot_grid(axes[-1, 2], prediction)
+    axes[-1, 2].set_title("Prediction")
 
     plt.tight_layout()
     plt.show()
