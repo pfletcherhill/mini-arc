@@ -135,3 +135,26 @@ def visualize_tensors(
 
     plt.tight_layout()
     plt.show()
+
+
+def visualize_output_query(output_query):
+    # Convert to numpy for easy handling with matplotlib
+    output_query_np = output_query.detach().cpu().numpy()
+
+    # Plot the mean value of each dimension
+    plt.figure(figsize=(10, 5))
+    plt.plot(np.mean(output_query_np, axis=1).squeeze())
+    plt.title("Mean Value of Output Query Dimensions")
+    plt.xlabel("Dimension")
+    plt.ylabel("Mean Value")
+    plt.show()
+
+    print(output_query_np.shape)
+
+    # Plot the values as a heatmap (if grid_dim is small enough)
+    # if output_query_np.shape[1] <= 64:  # Adjust threshold as needed
+    plt.figure(figsize=(10, 10))
+    plt.imshow(output_query_np.squeeze(), cmap="viridis")
+    plt.title("Output Query Heatmap")
+    plt.colorbar()
+    plt.show()

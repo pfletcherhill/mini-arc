@@ -41,7 +41,7 @@ def move_shapes(grid, direction, shift):
 
 def generate_example(direction, shift):
     input_grid = generate_grid()
-    num_shapes = random.randint(1, 3)
+    num_shapes = random.randint(3, 8)
     for _ in range(num_shapes):
         add_random_shape(input_grid)
 

@@ -1,5 +1,6 @@
 import random
 import string
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -131,21 +132,26 @@ def train_arc_transformer(
     num_epochs: int,
     learning_rate: float,
     weight_decay: float,
+    model_file_name: Optional[str] = None,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    model_file_name = f"model_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}.pth"
+    if model_file_name is None:
+        model_file_name = f"model_{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}.pth"
+    else:
+        state_dict = torch.load(f"/vol/models/{model_file_name}")
+        model.load_state_dict(state_dict)
 
     # Loss function and optimizer
     class_weights = torch.ones(model.num_classes).to(device)
     class_weights[0] = 0.1
-    class_weights[1] = 0.4
+    # class_weights[1] = 0.5
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.AdamW(
         model.parameters(),
         lr=learning_rate,
-        weight_decay=weight_decay,
+        # weight_decay=weight_decay,
     )
 
     # Learning rate scheduler
@@ -171,7 +177,7 @@ def train_arc_transformer(
             loss.backward()
 
             # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             optimizer.step()
 
@@ -232,9 +238,16 @@ def train_on_modal(
     num_epochs: int,
     learning_rate: float,
     weight_decay: float,
+    model_file_name: Optional[str] = None,
 ):
     return (
         train_arc_transformer(
-            model, train_loader, val_loader, num_epochs, learning_rate, weight_decay
+            model,
+            train_loader,
+            val_loader,
+            num_epochs,
+            learning_rate,
+            weight_decay,
+            model_file_name,
         ),
     )
