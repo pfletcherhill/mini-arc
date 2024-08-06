@@ -3,11 +3,11 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 
 
-@dataclass
-class ARCDatasetConfig:
+@dataclass(frozen=True)
+class ARCDatasetParams:
     max_grid_size: int = 30
     max_train_grids: int = 10
     color_offset: int = 1
@@ -20,7 +20,7 @@ def get_task_from_file(file_name: str, task_id: str) -> dict:
 
 
 def pad_and_mask_grid(
-    grid: list[list[int]], config: ARCDatasetConfig
+    grid: list[list[int]], config: ARCDatasetParams
 ) -> tuple[torch.Tensor, torch.Tensor]:
     h, w = len(grid), len(grid[0])
     if h > config.max_grid_size or w > config.max_grid_size:
@@ -46,13 +46,11 @@ def pad_and_mask_grid(
 class ARCDataset(Dataset):
     challenges: dict
     solutions: dict
-    # challenges_file: str
-    # solutions_file: str
     task_ids: list[str]
-    config: ARCDatasetConfig
+    config: ARCDatasetParams
 
     def __init__(
-        self, challenges_file: str, solutions_file: str, config: ARCDatasetConfig
+        self, challenges_file: str, solutions_file: str, config: ARCDatasetParams
     ):
         # self.challenges_file = challenges_file
         # self.solutions_file = solutions_file
@@ -122,3 +120,35 @@ def collate_arc_fn(
     output = torch.stack([item["output"] for item in batch])
 
     return (grids, masks, output)
+
+
+def make_data_loaders(
+    dataset_dir: str, batch_size: int, params: ARCDatasetParams
+) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
+    train_dataset = ARCDataset(
+        f"{dataset_dir}/training_challenges.json",
+        f"{dataset_dir}/training_solutions.json",
+        config=params,
+    )
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=collate_arc_fn,
+        num_workers=0,
+    )
+
+    val_dataset = ARCDataset(
+        f"{dataset_dir}/evaluation_challenges.json",
+        f"{dataset_dir}/evaluation_solutions.json",
+        config=params,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=collate_arc_fn,
+        num_workers=0,
+    )
+
+    return (train_loader, val_loader)

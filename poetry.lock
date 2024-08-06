@@ -2592,6 +2592,16 @@ qa = ["flake8 (==5.0.4)", "mypy (==0.971)", "types-setuptools (==67.2.0.1)"]
 testing = ["docopt", "pytest"]
 
 [[package]]
+name = "petname"
+version = "2.6"
+description = "Generate human-readable, random object names"
+optional = false
+python-versions = "*"
+files = [
+    {file = "petname-2.6.tar.gz", hash = "sha256:981c31ef772356a373640d1bb7c67c102e0159eda14578c67a1c99d5b34c9e4c"},
+]
+
+[[package]]
 name = "pexpect"
 version = "4.9.0"
 description = "Pexpect allows easy control of interactive console applications."
@@ -4331,4 +4341,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "eed0b3fe2e9c16a4df58171ada41eae9bccf663a7a55f28620d7efebc560bab2"
+content-hash = "a2572d6c1da4755b1a63499d277bfc37d65a520e9ce8dca3ec39e02f7cc888a6"

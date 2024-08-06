@@ -6,6 +6,8 @@ import numpy as np
 import seaborn as sns
 import torch
 
+from arc_prize.train import EpochState
+
 COLORS = [
     "#DADADA",  # padding grey
     "#252525",  # black
@@ -20,6 +22,23 @@ COLORS = [
     "#8D1D2C",  # 870C25', # brown
     "#FFFFFF",
 ]
+
+
+def visualize_epochs(epochs: dict[str, list[EpochState]]):
+    plt.figure(figsize=(10, 5))
+    for k, v in epochs.items():
+        train_loss = []
+        eval_loss = []
+        for epoch in v:
+            train_loss.append(epoch.train_loss)
+            eval_loss.append(epoch.val_loss)
+        # plt.plot(train_loss, label=f"{k} Training Loss")
+        plt.plot(eval_loss, label=f"{k} Evaluation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.title("Training and Evaluation Losses")
+    plt.show()
 
 
 def visualize_grids(

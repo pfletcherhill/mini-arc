@@ -1,136 +1,20 @@
-from typing import Optional
+from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 
-# from arc_prize.vis import visualize_mask
 
-
-class ARCTransformerEncoder(nn.Module):
+@dataclass(frozen=True)
+class ARCTransformerEncoderDecoderParams:
     grid_dim: int
     num_train_pairs: int
-    num_classes: int
-    num_layers: int
+    num_colors: int
+    num_encoder_layers: int
+    num_decoder_layers: int
     num_heads: int
     d_model: int
     d_ff: int
     dropout: float
-
-    def __init__(
-        self,
-        grid_dim: int = 30,
-        num_train_pairs: int = 10,
-        num_colors: int = 11,
-        num_layers: int = 8,
-        num_heads: int = 8,
-        d_model: int = 512,
-        d_ff: int = 1024,
-        dropout: float = 0.1,
-    ):
-        super(ARCTransformerEncoder, self).__init__()
-        self.grid_dim = grid_dim
-        self.num_train_pairs = num_train_pairs
-        self.num_classes = num_colors + 1  # Add padding class
-        self.num_layers = num_layers
-        self.num_heads = num_heads
-        self.d_model = d_model
-        self.d_ff = d_ff
-        self.dropout = dropout
-
-        self.embedding = nn.Embedding(self.num_classes, self.d_model)
-        # self.pos_encoding = TrainablePositionalEncoding(
-        #     self.d_model,
-        #     max_len=(self.num_train_pairs * 2 + 1) * self.grid_dim * self.grid_dim,
-        # )
-        self.pos_encoding = ARCPositionalEncoding(
-            d_model=self.d_model,
-            grid_dim=self.grid_dim,
-            num_train_pairs=self.num_train_pairs,
-        )
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.d_model,
-            nhead=self.num_heads,
-            dim_feedforward=self.d_ff,
-            dropout=self.dropout,
-        )
-        self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer, num_layers=self.num_layers
-        )
-
-        # Add layer normalization before the output layer
-        # self.layer_norm = nn.LayerNorm(self.d_model)
-        self.output_layer = nn.Linear(self.d_model, self.num_classes)
-        # self.output_layer = nn.Sequential(
-        #     self.layer_norm, nn.Linear(self.d_model, self.num_classes)
-        # )
-
-    def forward(
-        self,
-        grids: torch.Tensor,
-        masks: torch.Tensor,
-        output: Optional[torch.Tensor] = None,
-    ):
-        batch_size, num_grids, height, width = grids.size()
-
-        # Apply grid masks
-        masked_grids = torch.where(masks, grids, torch.zeros_like(grids))
-
-        # Embed input
-        x = self.embedding(
-            masked_grids
-        )  # This should now be (batch_size, num_grids, height, width, d_model)
-
-        # Add trainable positional encoding
-        x = self.pos_encoding(x)
-
-        # Flatten grids
-        x = x.view(batch_size, num_grids, -1, self.d_model)
-
-        # Flatten the grid_masks to create attention mask
-        mask = masks.view(batch_size, num_grids, -1).bool()
-
-        # Create attention mask for transformer
-        seq_len = (self.num_train_pairs * 2 + 1) * self.grid_dim * self.grid_dim
-        attn_mask = mask.view(batch_size, -1)
-        attn_mask = attn_mask.unsqueeze(1).expand(-1, seq_len, -1)
-        attn_mask = ~attn_mask
-
-        # Instead of expanding for all heads at once, iterate over each head
-        attn_mask_final = []
-        for _ in range(self.num_heads):
-            attn_mask_final.append(attn_mask)
-        attn_mask = torch.stack(
-            attn_mask_final
-        )  # Shape: (num_heads, batch_size, seq_len, seq_len)
-        attn_mask = attn_mask.reshape(self.num_heads * batch_size, seq_len, seq_len)
-
-        key_padding_mask = ~mask.view(batch_size, -1)
-
-        # Transformer encoder
-        x = x.view(batch_size, -1, self.d_model)
-        x = x.permute(1, 0, 2)  # (seq_len, batch_size, d_model)
-        x = self.transformer_encoder(
-            x, src_key_padding_mask=key_padding_mask, mask=attn_mask
-        )
-
-        x = x.permute(1, 0, 2)  # (batch_size, seq_len, d_model)
-
-        # Output layer
-        x = self.output_layer(x)
-        # print("output", x.shape)
-
-        # Reshape to match the original grid shape
-        x = x.view(batch_size, num_grids, height, width, self.num_classes)
-
-        # If we're in training mode and output is provided, use teacher forcing
-        if self.training and output is not None:
-            output_embedded = self.embedding(output)
-            x[:, -1] = self.output_layer(output_embedded).view(
-                batch_size, height, width, -1
-            )
-
-        return x[:, -1]  # Return only the last grid (test output)
 
 
 class ARCTransformerEncoderDecoder(nn.Module):
@@ -144,28 +28,17 @@ class ARCTransformerEncoderDecoder(nn.Module):
     d_ff: int
     dropout: float
 
-    def __init__(
-        self,
-        grid_dim: int,
-        num_train_pairs: int,
-        num_colors: int,
-        num_encoder_layers: int,
-        num_decoder_layers: int,
-        num_heads: int,
-        d_model: int,
-        d_ff: int,
-        dropout: float,
-    ):
+    def __init__(self, params: ARCTransformerEncoderDecoderParams):
         super().__init__()
-        self.grid_dim = grid_dim
-        self.num_train_pairs = num_train_pairs
-        self.num_classes = num_colors + 1
-        self.d_model = d_model
-        self.num_encoder_layers = num_encoder_layers
-        self.num_decoder_layers = num_decoder_layers
-        self.num_heads = num_heads
-        self.d_ff = d_ff
-        self.dropout = dropout
+        self.grid_dim = params.grid_dim
+        self.num_train_pairs = params.num_train_pairs
+        self.num_classes = params.num_colors + 1
+        self.d_model = params.d_model
+        self.num_encoder_layers = params.num_encoder_layers
+        self.num_decoder_layers = params.num_decoder_layers
+        self.num_heads = params.num_heads
+        self.d_ff = params.d_ff
+        self.dropout = params.dropout
 
         self.embedding = nn.Embedding(self.num_classes, self.d_model)
         self.pos_encoding = ARCPositionalEncoding(
@@ -184,7 +57,7 @@ class ARCTransformerEncoderDecoder(nn.Module):
         )
         self.decoder = nn.TransformerDecoder(decoder_layer, self.num_decoder_layers)
 
-        self.output_query = nn.Parameter(torch.randn(1, grid_dim**2, self.d_model))
+        self.output_query = nn.Parameter(torch.randn(1, self.grid_dim**2, self.d_model))
         self.output_layer = nn.Linear(self.d_model, self.num_classes)
 
     def forward(self, src, src_mask):
@@ -229,9 +102,6 @@ class ARCTransformerEncoderDecoder(nn.Module):
             # print("output shape", output.shape)
             # print("output sample", output[0, 0, 0])
             return torch.argmax(output, dim=-1)
-
-
-ARCTransformer = ARCTransformerEncoderDecoder
 
 
 class TrainablePositionalEncoding(nn.Module):
