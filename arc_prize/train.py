@@ -186,7 +186,7 @@ def train_arc_transformer(
                 lr=param_group["lr"],
                 beta1=beta1,
                 beta2=beta2,
-                epsilon=param_group["ep"],
+                epsilon=param_group["eps"],
                 weight_decay=param_group["weight_decay"],
                 grad_norm=calculate_grad_norm(model),
                 param_norm=calculate_param_norm(model),

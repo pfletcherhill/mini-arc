@@ -25,18 +25,51 @@ COLORS = [
 
 
 def visualize_epochs(epochs: dict[str, list[EpochState]]):
-    plt.figure(figsize=(10, 5))
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax2 = ax1.twinx()
+
     for k, v in epochs.items():
         train_loss = []
         eval_loss = []
+        lr = []
+        weight_decay = []
+        beta1 = []
+        beta2 = []
+        epsilon = []
+        grad_norm = []
+        param_norm = []
         for epoch in v:
             train_loss.append(epoch.train_loss)
             eval_loss.append(epoch.val_loss)
-        plt.plot(train_loss, label=f"{k} Training Loss")
-        plt.plot(eval_loss, label=f"{k} Evaluation Loss")
+            lr.append(epoch.lr)
+            weight_decay.append(epoch.weight_decay)
+            beta1.append(epoch.beta1)
+            beta2.append(epoch.beta2)
+            epsilon.append(epoch.epsilon)
+            grad_norm.append(epoch.grad_norm)
+            # param_norm.append(epoch.param_norm)
+
+        ax1.plot(train_loss, label=f"{k} Training Loss", linestyle="-")
+        ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="-")
+        ax1.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
+        ax1.plot(param_norm, label=f"{k} param_norm", linestyle="-")
+
+        ax2.plot(lr, label=f"{k} lr", linestyle="--")
+        ax2.plot(weight_decay, label=f"{k} weight_decay", linestyle="--")
+        # ax2.plot(beta1, label=f"{k} beta1")
+        # ax2.plot(beta2, label=f"{k} beta2")
+        # ax2.plot(epsilon, label=f"{k} epsilon")
+
+    # Combine legends from both axes
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+
+    # Place legend outside the plot
+    fig.legend(
+        lines1 + lines2, labels1 + labels2, loc="center left", bbox_to_anchor=(1, 0.5)
+    )
+
     plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
     plt.title("Training and Evaluation Losses")
     plt.show()
 
