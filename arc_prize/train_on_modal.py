@@ -4,7 +4,11 @@ from typing import Optional
 import modal
 import torch
 
-from arc_prize.model import ARCTransformerEncoderDecoderParams
+from arc_prize.data import ARCDatasetParams, make_data_loaders
+from arc_prize.model import (
+    ARCTransformerEncoderDecoder,
+    ARCTransformerEncoderDecoderParams,
+)
 from arc_prize.train import ARCModelState, ARCTrainParams, train_arc_transformer
 
 modal_image = modal.Image.debian_slim().pip_install("torch")
@@ -50,11 +54,48 @@ def get_model(model_name: str):
     checkpoint = torch.load(model_filename, map_location=device)
     return checkpoint
 
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(checkpoint, label='Training Loss')
-    # plt.plot(eval_losses, label='Evaluation Loss')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Loss')
-    # plt.legend()
-    # plt.title('Training and Evaluation Losses')
-    # plt.show()
+
+@modal_app.function(
+    gpu="t4",
+    volumes={"/vol/models": models_volume, "/vol/data": data_volume},
+    timeout=(60 * 60),
+)
+def evaluate_model(model_name: str, dataset_dir: str):
+    model_filename = f"/vol/models/{model_name}.pth"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = ARCModelState(**torch.load(model_filename, map_location=device))
+
+    model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
+    if checkpoint.model_state_dict is not None:
+        model.load_state_dict(checkpoint.model_state_dict)
+
+    dataset_params = ARCDatasetParams(
+        max_grid_size=model.grid_dim,
+        max_train_grids=model.num_train_pairs,
+        color_offset=1,
+    )
+    # dataset_dir = f"/vol/data/{checkpoint.train_params.dataset_name}"
+    _, val_loader = make_data_loaders(
+        dataset_dir,
+        batch_size=1,
+        params=dataset_params,
+    )
+
+    model.eval()
+
+    output = []
+
+    for i, batch in enumerate(val_loader):
+        grids, grid_masks, output_grid = [item.to(device) for item in batch]
+        predictions = model.generate(grids, grid_masks)
+        output.append(
+            {
+                "grids": grids.cpu().numpy(),
+                "output_grid": output_grid.cpu().numpy(),
+                "predictions": predictions.cpu().numpy(),
+            }
+        )
+
+    print(len(output), output[0])
+
+    return {"output": output}

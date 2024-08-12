@@ -32,7 +32,7 @@ def visualize_epochs(epochs: dict[str, list[EpochState]]):
         for epoch in v:
             train_loss.append(epoch.train_loss)
             eval_loss.append(epoch.val_loss)
-        # plt.plot(train_loss, label=f"{k} Training Loss")
+        plt.plot(train_loss, label=f"{k} Training Loss")
         plt.plot(eval_loss, label=f"{k} Evaluation Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")

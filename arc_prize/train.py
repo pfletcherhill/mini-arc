@@ -20,7 +20,7 @@ class ARCTrainParams:
     batch_size: int
     learning_rate: float
     weight_decay: float
-    dataset_name: str
+    dataset_dir: list[str]
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,13 @@ class EpochState:
     train_accuracy: float
     val_loss: float
     val_accuracy: float
+    lr: float
+    weight_decay: float
+    beta1: float
+    beta2: float
+    epsilon: float
+    grad_norm: float
+    param_norm: float
 
 
 @dataclass
@@ -39,6 +46,23 @@ class ARCModelState:
     optimizer_state_dict: Optional[dict]
     epochs: list[EpochState]
     best_val_loss: float
+
+
+def calculate_grad_norm(model: ARCTransformerEncoderDecoder):
+    total_norm = 0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+    return total_norm**0.5
+
+
+def calculate_param_norm(model: ARCTransformerEncoderDecoder):
+    total_norm = 0
+    for p in model.parameters():
+        param_norm = p.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    return total_norm**0.5
 
 
 def train_arc_transformer(
@@ -59,9 +83,11 @@ def train_arc_transformer(
         max_train_grids=model.num_train_pairs,
         color_offset=1,
     )
-    dataset_dir = f"/vol/data/{checkpoint.train_params.dataset_name}"
+    # dataset_dir = f"/vol/data/{checkpoint.train_params.dataset_name}"
     train_loader, val_loader = make_data_loaders(
-        dataset_dir, checkpoint.train_params.batch_size, dataset_params
+        checkpoint.train_params.dataset_dir,
+        checkpoint.train_params.batch_size,
+        dataset_params,
     )
 
     class_weights = torch.ones(model.num_classes).to(device)
@@ -79,7 +105,7 @@ def train_arc_transformer(
         optimizer.load_state_dict(checkpoint.optimizer_state_dict)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5, verbose=True
+        optimizer, mode="min", factor=0.5, patience=5
     )
 
     def save_checkpoint():
@@ -92,6 +118,8 @@ def train_arc_transformer(
         model.train()
         train_loss = 0.0
         train_accuracy = 0.0
+
+        print(optimizer.param_groups[0]["lr"], optimizer.param_groups[0].keys())
 
         for batch in train_loader:
             # grids, masks, target_grid = batch
@@ -144,12 +172,24 @@ def train_arc_transformer(
         # Learning rate scheduling
         scheduler.step(val_loss)
 
+        print("after", optimizer.param_groups[0]["lr"])
+
+        param_group = optimizer.param_groups[0]
+        beta1, beta2 = param_group["betas"]
+
         checkpoint.epochs.append(
             EpochState(
                 train_loss=train_loss,
                 train_accuracy=train_accuracy,
                 val_loss=val_loss,
                 val_accuracy=val_accuracy,
+                lr=param_group["lr"],
+                beta1=beta1,
+                beta2=beta2,
+                epsilon=param_group["ep"],
+                weight_decay=param_group["weight_decay"],
+                grad_norm=calculate_grad_norm(model),
+                param_norm=calculate_param_norm(model),
             )
         )
 

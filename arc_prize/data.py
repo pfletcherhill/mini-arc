@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 
 
 @dataclass(frozen=True)
@@ -123,13 +123,28 @@ def collate_arc_fn(
 
 
 def make_data_loaders(
-    dataset_dir: str, batch_size: int, params: ARCDatasetParams
+    dataset_dir: list[str], batch_size: int, params: ARCDatasetParams
 ) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
-    train_dataset = ARCDataset(
-        f"{dataset_dir}/training_challenges.json",
-        f"{dataset_dir}/training_solutions.json",
-        config=params,
-    )
+    train_datasets = []
+    val_datasets = []
+
+    for dir in dataset_dir:
+        train_dataset = ARCDataset(
+            f"{dir}/training_challenges.json",
+            f"{dir}/training_solutions.json",
+            config=params,
+        )
+        train_datasets.append(train_dataset)
+        val_dataset = ARCDataset(
+            f"{dir}/evaluation_challenges.json",
+            f"{dir}/evaluation_solutions.json",
+            config=params,
+        )
+        val_datasets.append(val_dataset)
+
+    train_dataset = ConcatDataset(train_datasets)
+    val_dataset = ConcatDataset(val_datasets)
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -138,11 +153,6 @@ def make_data_loaders(
         num_workers=0,
     )
 
-    val_dataset = ARCDataset(
-        f"{dataset_dir}/evaluation_challenges.json",
-        f"{dataset_dir}/evaluation_solutions.json",
-        config=params,
-    )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,

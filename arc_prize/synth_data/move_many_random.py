@@ -67,7 +67,7 @@ def generate_dataset(num_tasks: int) -> tuple:
         ]
         test_pair = generate_example(direction, shift)
 
-        challenges[f"task_{task_id}"] = {
+        challenges[f"move_many_{task_id}"] = {
             "train": train_pairs,
             "test": [{"input": test_pair["input"]}],
         }
