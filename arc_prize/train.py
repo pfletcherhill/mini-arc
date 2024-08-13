@@ -65,10 +65,7 @@ def calculate_param_norm(model: ARCTransformerEncoderDecoder):
     return total_norm**0.5
 
 
-def train_arc_transformer(
-    model_filename: str,
-    num_epochs: int,
-):
+def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 10):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint_dict = torch.load(model_filename)
@@ -113,13 +110,12 @@ def train_arc_transformer(
         print("Saved checkpoint", model_filename)
 
     total_epochs = len(checkpoint.epochs) + num_epochs
+    epochs_without_improvement = 0
 
     for epoch in range(len(checkpoint.epochs), total_epochs):
         model.train()
         train_loss = 0.0
         train_accuracy = 0.0
-
-        print(optimizer.param_groups[0]["lr"], optimizer.param_groups[0].keys())
 
         for batch in train_loader:
             # grids, masks, target_grid = batch
@@ -172,8 +168,6 @@ def train_arc_transformer(
         # Learning rate scheduling
         scheduler.step(val_loss)
 
-        print("after", optimizer.param_groups[0]["lr"])
-
         param_group = optimizer.param_groups[0]
         beta1, beta2 = param_group["betas"]
 
@@ -201,10 +195,19 @@ def train_arc_transformer(
         if val_loss < checkpoint.best_val_loss:
             checkpoint.best_val_loss = val_loss
             checkpoint.model_state_dict = model.state_dict()
+            epochs_without_improvement = 0
             print("New best val loss", val_loss)
+        else:
+            epochs_without_improvement += 1
 
         checkpoint.optimizer_state_dict = optimizer.state_dict()
         save_checkpoint()
+
+        if epochs_without_improvement >= patience:
+            print(
+                f"Early stopping triggered after {epochs_without_improvement} epochs without improvement"
+            )
+            break
 
     print("Training completed")
     return model

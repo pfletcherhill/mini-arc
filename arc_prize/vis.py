@@ -50,12 +50,12 @@ def visualize_epochs(epochs: dict[str, list[EpochState]]):
             # param_norm.append(epoch.param_norm)
 
         ax1.plot(train_loss, label=f"{k} Training Loss", linestyle="-")
-        ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="-")
+        ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="--")
         ax1.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
         ax1.plot(param_norm, label=f"{k} param_norm", linestyle="-")
 
-        ax2.plot(lr, label=f"{k} lr", linestyle="--")
-        ax2.plot(weight_decay, label=f"{k} weight_decay", linestyle="--")
+        ax2.plot(lr, label=f"{k} lr", linestyle=":")
+        # ax2.plot(weight_decay, label=f"{k} weight_decay", linestyle="--")
         # ax2.plot(beta1, label=f"{k} beta1")
         # ax2.plot(beta2, label=f"{k} beta2")
         # ax2.plot(epsilon, label=f"{k} epsilon")
