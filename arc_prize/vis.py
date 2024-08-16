@@ -25,53 +25,91 @@ COLORS = [
 
 
 def visualize_epochs(epochs: dict[str, list[EpochState]]):
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax2 = ax1.twinx()
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15), sharex=True)
 
     for k, v in epochs.items():
         train_loss = []
         eval_loss = []
         lr = []
-        weight_decay = []
-        beta1 = []
-        beta2 = []
-        epsilon = []
         grad_norm = []
-        param_norm = []
         for epoch in v:
             train_loss.append(epoch.train_loss)
             eval_loss.append(epoch.val_loss)
             lr.append(epoch.lr)
-            weight_decay.append(epoch.weight_decay)
-            beta1.append(epoch.beta1)
-            beta2.append(epoch.beta2)
-            epsilon.append(epoch.epsilon)
             grad_norm.append(epoch.grad_norm)
-            # param_norm.append(epoch.param_norm)
 
+        # Plot training and evaluation loss
         ax1.plot(train_loss, label=f"{k} Training Loss", linestyle="-")
         ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="--")
-        ax1.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
-        ax1.plot(param_norm, label=f"{k} param_norm", linestyle="-")
+        ax1.set_ylabel("Loss")
+        ax1.set_title("Training and Evaluation Losses")
+        ax1.legend()
 
-        ax2.plot(lr, label=f"{k} lr", linestyle=":")
-        # ax2.plot(weight_decay, label=f"{k} weight_decay", linestyle="--")
-        # ax2.plot(beta1, label=f"{k} beta1")
-        # ax2.plot(beta2, label=f"{k} beta2")
-        # ax2.plot(epsilon, label=f"{k} epsilon")
+        # Plot grad_norm
+        ax2.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
+        ax2.set_ylabel("Gradient Norm")
+        ax2.set_title("Gradient Norm")
+        ax2.legend()
 
-    # Combine legends from both axes
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-
-    # Place legend outside the plot
-    fig.legend(
-        lines1 + lines2, labels1 + labels2, loc="center left", bbox_to_anchor=(1, 0.5)
-    )
+        # Plot learning rate
+        ax3.plot(lr, label=f"{k} lr", linestyle=":")
+        ax3.set_ylabel("Learning Rate")
+        ax3.set_title("Learning Rate")
+        ax3.legend()
 
     plt.xlabel("Epoch")
-    plt.title("Training and Evaluation Losses")
+    plt.tight_layout()
     plt.show()
+
+
+# def visualize_epochs(epochs: dict[str, list[EpochState]]):
+#     fig, ax1 = plt.subplots(figsize=(12, 6))
+#     ax2 = ax1.twinx()
+
+#     for k, v in epochs.items():
+#         train_loss = []
+#         eval_loss = []
+#         lr = []
+#         weight_decay = []
+#         beta1 = []
+#         beta2 = []
+#         epsilon = []
+#         grad_norm = []
+#         param_norm = []
+#         for epoch in v:
+#             train_loss.append(epoch.train_loss)
+#             eval_loss.append(epoch.val_loss)
+#             lr.append(epoch.lr)
+#             weight_decay.append(epoch.weight_decay)
+#             beta1.append(epoch.beta1)
+#             beta2.append(epoch.beta2)
+#             epsilon.append(epoch.epsilon)
+#             grad_norm.append(epoch.grad_norm)
+#             # param_norm.append(epoch.param_norm)
+
+#         ax1.plot(train_loss, label=f"{k} Training Loss", linestyle="-")
+#         ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="--")
+#         # ax1.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
+#         # ax1.plot(param_norm, label=f"{k} param_norm", linestyle="-")
+
+#         ax2.plot(lr, label=f"{k} lr", linestyle=":")
+#         # ax2.plot(weight_decay, label=f"{k} weight_decay", linestyle="--")
+#         # ax2.plot(beta1, label=f"{k} beta1")
+#         # ax2.plot(beta2, label=f"{k} beta2")
+#         # ax2.plot(epsilon, label=f"{k} epsilon")
+
+#     # Combine legends from both axes
+#     lines1, labels1 = ax1.get_legend_handles_labels()
+#     lines2, labels2 = ax2.get_legend_handles_labels()
+
+#     # Place legend outside the plot
+#     fig.legend(
+#         lines1 + lines2, labels1 + labels2, loc="center left", bbox_to_anchor=(1, 0.5)
+#     )
+
+#     plt.xlabel("Epoch")
+#     plt.title("Training and Evaluation Losses")
+#     plt.show()
 
 
 def visualize_grids(
@@ -209,4 +247,38 @@ def visualize_output_query(output_query):
     plt.imshow(output_query_np.squeeze(), cmap="viridis")
     plt.title("Output Query Heatmap")
     plt.colorbar()
+    plt.show()
+
+
+def visualize_attention(attention_weights, layer=0, head=0):
+    # attention_weights is a tensor of shape [batch_size, num_layers, num_heads, src_len, src_len]
+
+    # Select a specific layer, head, and batch item
+    attn = attention_weights[0, layer, head].cpu().numpy()
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(attn, cmap="viridis")
+    plt.title(f"Attention Weights - Layer {layer}, Head {head}")
+    plt.show()
+
+
+def visualize_all_heads(attention_weights, title: str):
+    # Get the number of heads
+    num_heads = attention_weights.shape[0]
+    print("num_heads", num_heads)
+
+    # Create a grid of subplots
+    fig, axes = plt.subplots(2, max(2, num_heads // 2), figsize=(20, 10))
+    fig.suptitle(title)
+
+    for head in range(num_heads):
+        print("head", head)
+        ax = axes[head // (num_heads // 2), head % (num_heads // 2)]
+        attn = attention_weights[head].cpu().numpy()
+        print("attn", attn.shape)
+        sns.heatmap(attn, ax=ax, cmap="viridis")
+        ax.set_title(f"Head {head}")
+        ax.axis("off")
+
+    plt.tight_layout()
     plt.show()

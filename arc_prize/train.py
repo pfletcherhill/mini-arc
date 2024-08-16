@@ -12,6 +12,8 @@ from arc_prize.data import (
 from arc_prize.model import (
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
+    ARCTransformerMaskedEncoderDecoder,
+    ARCTransformerMaskedEncoderDecoderParams,
 )
 
 
@@ -46,6 +48,7 @@ class ARCModelState:
     optimizer_state_dict: Optional[dict]
     epochs: list[EpochState]
     best_val_loss: float
+    # encoder_attn_weights: Optional[list] = None # Too large to keep
 
 
 def calculate_grad_norm(model: ARCTransformerEncoderDecoder):
@@ -67,6 +70,8 @@ def calculate_param_norm(model: ARCTransformerEncoderDecoder):
 
 def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 10):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    torch.backends.mha.set_fastpath_enabled(False)
 
     checkpoint_dict = torch.load(model_filename)
     checkpoint = ARCModelState(**checkpoint_dict)
@@ -122,7 +127,7 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
             grids, masks, target_grid = [item.to(device) for item in batch]
 
             optimizer.zero_grad()
-            output = model(grids, masks)
+            output, _ = model(grids, masks)
 
             loss = criterion(
                 output.view(-1, model.num_classes), target_grid.view(-1).long()
@@ -152,7 +157,7 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
                 # grids, masks, target_grid = batch
                 grids, masks, target_grid = [item.to(device) for item in batch]
 
-                output = model(grids, masks)
+                output, encoder_attn_weights = model(grids, masks)
                 loss = criterion(
                     output.view(-1, model.num_classes), target_grid.view(-1).long()
                 )
@@ -187,6 +192,10 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
             )
         )
 
+        # for batch in encoder_attn_weights:
+        #     for layer in batch:
+        #         visualize_all_heads(layer)
+
         print(f"Epoch {epoch+1}/{total_epochs}:")
         print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
@@ -195,6 +204,7 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
         if val_loss < checkpoint.best_val_loss:
             checkpoint.best_val_loss = val_loss
             checkpoint.model_state_dict = model.state_dict()
+            # checkpoint.encoder_attn_weights = encoder_attn_weights
             epochs_without_improvement = 0
             print("New best val loss", val_loss)
         else:

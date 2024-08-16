@@ -1,6 +1,5 @@
 from typing import Optional
 
-# import matplotlib.pyplot as plt
 import modal
 import torch
 
@@ -60,7 +59,7 @@ def get_model(model_name: str):
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60),
 )
-def evaluate_model(model_name: str, dataset_dir: str):
+def evaluate_model(model_name: str, dataset_dir: list[str]):
     model_filename = f"/vol/models/{model_name}.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = ARCModelState(**torch.load(model_filename, map_location=device))
