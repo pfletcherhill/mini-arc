@@ -250,18 +250,6 @@ def visualize_output_query(output_query):
     plt.show()
 
 
-def visualize_attention(attention_weights, layer=0, head=0):
-    # attention_weights is a tensor of shape [batch_size, num_layers, num_heads, src_len, src_len]
-
-    # Select a specific layer, head, and batch item
-    attn = attention_weights[0, layer, head].cpu().numpy()
-
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(attn, cmap="viridis")
-    plt.title(f"Attention Weights - Layer {layer}, Head {head}")
-    plt.show()
-
-
 def visualize_all_heads(attention_weights, title: str):
     # Get the number of heads
     num_heads = attention_weights.shape[0]
@@ -279,6 +267,75 @@ def visualize_all_heads(attention_weights, title: str):
         sns.heatmap(attn, ax=ax, cmap="viridis")
         ax.set_title(f"Head {head}")
         ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_mean_mha_attention(attention_weights, num_grids=9, grid_size=10):
+    # Reshape the attention weights
+    # From [4, 100, 900] to [4, 100, 9, 10, 10]
+    reshaped_attention = attention_weights.view(4, 100, num_grids, grid_size, grid_size)
+
+    # Calculate mean attention across the target sequence (dim=1)
+    mean_attention = reshaped_attention.mean(dim=1)  # Shape: [4, 9, 10, 10]
+
+    # Create a figure with subplots for each head
+    fig, axes = plt.subplots(4, 9, figsize=(20, 10))
+
+    for head in range(4):
+        # Create a 3x3 grid of heatmaps
+        for i in range(9):
+            grid_attention = mean_attention[head, i]
+
+            # Add subplot within the head's subplot
+            # sub_ax = ax.inset_axes([1/9])
+            ax = axes[head, i]
+            im = ax.imshow(grid_attention, cmap="viridis", interpolation="nearest")
+            ax.axis("off")
+
+            if i == 0:
+                ax.set_ylabel(f"Head {head + 1}", rotation=0, ha="right", va="center")
+
+            # Add colorbar for each grid
+            # plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+        # Remove ticks from the main subplot
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_mean_sa_attention(attn_weights: torch.Tensor, grid_dim: int = 10):
+    num_heads = attn_weights.shape[0]
+    # Reshape the attention weights
+    # From [4, 100, 900] to [4, 100, 9, 10, 10]
+    reshaped_attention = attn_weights.view(num_heads, grid_dim**2, grid_dim, grid_dim)
+
+    # Calculate mean attention across the target sequence (dim=1)
+    mean_attention = reshaped_attention.mean(dim=1)
+
+    # Create a figure with subplots for each head
+    fig, axes = plt.subplots(num_heads, 1, figsize=(20, 10))
+
+    for head in range(num_heads):
+        grid_attention = mean_attention[head]
+
+        ax = axes[head]
+        im = ax.imshow(grid_attention, cmap="viridis", interpolation="nearest")
+        ax.axis("off")
+
+        if i == 0:
+            ax.set_ylabel(f"Head {head + 1}", rotation=0, ha="right", va="center")
+
+        # Add colorbar for each grid
+        # plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+        # Remove ticks from the main subplot
+        ax.set_xticks([])
+        ax.set_yticks([])
 
     plt.tight_layout()
     plt.show()

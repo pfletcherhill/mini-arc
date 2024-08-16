@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass
+from json import decoder
 from typing import Optional
 
 # import matplotlib.pyplot as plt
@@ -209,6 +210,136 @@ class EncoderWithAttention(nn.TransformerEncoder):
         return output, torch.stack(attn_weights, dim=1)
 
 
+class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__(d_model, nhead, dim_feedforward, dropout, batch_first=True)
+
+    def forward(
+        self,
+        tgt: torch.Tensor,
+        memory: torch.Tensor,
+        tgt_mask: Optional[torch.Tensor] = None,
+        memory_mask: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+        memory_key_padding_mask: Optional[torch.Tensor] = None,
+        tgt_is_causal: bool = False,
+        memory_is_causal: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x = tgt
+        x_sa, sa_attn_weights = self._sa_block(
+            x, tgt_mask, tgt_key_padding_mask, tgt_is_causal
+        )
+        x = self.norm1(x + x_sa)
+
+        x_mha, mha_attn_weights = self._mha_block(
+            x, memory, memory_mask, memory_key_padding_mask, memory_is_causal
+        )
+        x = self.norm2(x + x_mha)
+        x = self.norm3(x + self._ff_block(x))
+
+        return x, sa_attn_weights, mha_attn_weights
+
+    # self-attention block
+    def _sa_block(
+        self,
+        x: torch.Tensor,
+        attn_mask: Optional[torch.Tensor],
+        key_padding_mask: Optional[torch.Tensor],
+        is_causal: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x, sa_attn_weights = self.self_attn(
+            x,
+            x,
+            x,
+            attn_mask=attn_mask,
+            key_padding_mask=key_padding_mask,
+            is_causal=is_causal,
+            need_weights=True,
+            average_attn_weights=False,
+        )
+        return self.dropout1(x), sa_attn_weights
+
+    # multihead attention block
+    def _mha_block(
+        self,
+        x: torch.Tensor,
+        mem: torch.Tensor,
+        attn_mask: Optional[torch.Tensor],
+        key_padding_mask: Optional[torch.Tensor],
+        is_causal: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x, mha_attn_weights = self.multihead_attn(
+            x,
+            mem,
+            mem,
+            attn_mask=attn_mask,
+            key_padding_mask=key_padding_mask,
+            is_causal=is_causal,
+            need_weights=True,
+            average_attn_weights=False,
+        )
+        return self.dropout2(x), mha_attn_weights
+
+    # feed forward block
+    def _ff_block(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
+        return self.dropout3(x)
+
+
+class DecoderWithAttention(nn.TransformerDecoder):
+    def __init__(
+        self,
+        decoder_layer: "DecoderLayerWithAttention",
+        num_layers: int,
+    ) -> None:
+        super().__init__(decoder_layer, num_layers)
+
+    def forward(
+        self,
+        tgt: torch.Tensor,
+        memory: torch.Tensor,
+        tgt_mask: Optional[torch.Tensor] = None,
+        memory_mask: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+        memory_key_padding_mask: Optional[torch.Tensor] = None,
+        tgt_is_causal: Optional[bool] = None,
+        memory_is_causal: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        output = tgt
+
+        sa_attn_weights = []
+        mha_attn_weights = []
+
+        for mod in self.layers:
+            output, layer_sa_attn_weights, layer_mha_attn_weights = mod(
+                output,
+                memory,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                memory_key_padding_mask=memory_key_padding_mask,
+                tgt_is_causal=tgt_is_causal,
+                memory_is_causal=memory_is_causal,
+            )
+            sa_attn_weights.append(layer_sa_attn_weights)
+            mha_attn_weights.append(layer_mha_attn_weights)
+
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return (
+            output,
+            torch.stack(sa_attn_weights, dim=1),
+            torch.stack(mha_attn_weights, dim=1),
+        )
+
+
 class ARCTransformerEncoderDecoder(nn.Module):
     grid_dim: int
     num_train_pairs: int
@@ -264,15 +395,22 @@ class ARCTransformerEncoderDecoder(nn.Module):
         # self.encoder = nn.TransformerEncoder(encoder_layer, self.num_encoder_layers)
         self.encoder = EncoderWithAttention(encoder_layer, self.num_encoder_layers)
 
-        decoder_layer = nn.TransformerDecoderLayer(
-            self.d_model, self.num_heads, self.d_ff, self.dropout, batch_first=True
+        # decoder_layer = nn.TransformerDecoderLayer(
+        #     self.d_model, self.num_heads, self.d_ff, self.dropout, batch_first=True
+        # )
+        decoder_layer = DecoderLayerWithAttention(
+            self.d_model, self.num_heads, self.d_ff, self.dropout
         )
-        self.decoder = nn.TransformerDecoder(decoder_layer, self.num_decoder_layers)
+
+        # self.decoder = nn.TransformerDecoder(decoder_layer, self.num_decoder_layers)
+        self.decoder = DecoderWithAttention(decoder_layer, self.num_decoder_layers)
 
         self.output_query = nn.Parameter(torch.randn(1, self.grid_dim**2, self.d_model))
         self.output_layer = nn.Linear(self.d_model, self.num_classes)
 
-    def forward(self, src, src_mask) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, src, src_mask
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # src shape: (batch_size, num_input_grids, grid_dim, grid_dim)
         batch_size = src.shape[0]
 
@@ -286,9 +424,6 @@ class ARCTransformerEncoderDecoder(nn.Module):
 
         # Encode input
         padding_mask = ~src_mask.view(batch_size, -1)
-        # print("size padding mask", padding_mask.shape)
-        # print("src size", src.shape, src.transpose(0, 1).shape)
-        # visualize_mask(padding_mask, "Padding mask")
 
         memory, encoder_attn_weights = self.encoder(
             src, src_key_padding_mask=padding_mask
@@ -298,7 +433,7 @@ class ARCTransformerEncoderDecoder(nn.Module):
         output_query = self.output_query.expand(batch_size, -1, -1)
 
         # Decode
-        output = self.decoder(
+        output, decoder_sa_attn_weights, decoder_mha_attn_weights = self.decoder(
             output_query, memory, memory_key_padding_mask=padding_mask
         )
 
@@ -308,14 +443,32 @@ class ARCTransformerEncoderDecoder(nn.Module):
         # Reshape to grid
         output = output.view(batch_size, self.grid_dim, self.grid_dim, self.num_classes)
 
-        return output, encoder_attn_weights
+        return (
+            output,
+            encoder_attn_weights,
+            decoder_sa_attn_weights,
+            decoder_mha_attn_weights,
+        )
 
-    def generate(self, src, src_mask=None) -> torch.Tensor:
+    # TODO: potentially add temperature arg
+    def generate(
+        self, src, src_mask=None
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
-            output, _ = self.forward(src, src_mask)
+            (
+                output,
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            ) = self.forward(src, src_mask)
             # print("output shape", output.shape)
             # print("output sample", output[0, 0, 0])
-            return torch.argmax(output, dim=-1)
+            return (
+                torch.argmax(output, dim=-1),
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            )
 
 
 class ARCTransformerMaskedEncoderDecoder(nn.Module):

@@ -86,15 +86,21 @@ def evaluate_model(model_name: str, dataset_dir: list[str]):
 
     for i, batch in enumerate(val_loader):
         grids, grid_masks, output_grid = [item.to(device) for item in batch]
-        predictions = model.generate(grids, grid_masks)
+        (
+            predictions,
+            encoder_attn_weights,
+            decoder_sa_weights,
+            decoder_mha_weights,
+        ) = model.generate(grids, grid_masks)
         output.append(
             {
                 "grids": grids.cpu().numpy(),
                 "output_grid": output_grid.cpu().numpy(),
                 "predictions": predictions.cpu().numpy(),
+                "encoder_attn_weights": encoder_attn_weights.cpu().numpy(),
+                "decoder_sa_attn_weights": decoder_sa_weights.cpu().numpy(),
+                "decoder_mha_attn_weights": decoder_mha_weights.cpu().numpy(),
             }
         )
 
-    print(len(output), output[0])
-
-    return {"output": output}
+    return output
