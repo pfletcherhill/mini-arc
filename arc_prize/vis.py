@@ -8,54 +8,90 @@ import torch
 
 from arc_prize.train import EpochState
 
+# --magenta: #E53AA3;
+# --magenta-light: #ff7bcc;
+# --red: #F93C31;
+# --blue: #1E93FF;
+# --blue-light: #87D8F1;
+# --yellow: #FFDC00;
+# --orange: #FF851B;
+# --maroon: #921231;
+# --green: #4FCC30;
+# --gray: #555555;
+# --gray-light: #999999;
+
 COLORS = [
-    "#DADADA",  # padding grey
-    "#252525",  # black
-    "#0074D9",  # blue
-    "#FF4136",  # red
-    "#37D449",  # 2ECC40', # green
+    "#c2c0c0",  # padding grey
+    "#111111",  # black
+    "#1E93FF",  # blue
+    "#F93C31",  # red
+    "#4FCC30",  # green
     "#FFDC00",  # yellow
     "#E6E6E6",  # grey
-    "#F012BE",  # pink
-    "#FF871E",  # orange
-    "#54D2EB",  # 7FDBFF', # light blue
-    "#8D1D2C",  # 870C25', # brown
+    "#E53AA3",  # magenta
+    "#FF851B",  # orange
+    "#87D8F1",  # light blue
+    "#921231",  # maroon
     "#FFFFFF",
 ]
 
 
 def visualize_epochs(epochs: dict[str, list[EpochState]]):
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15), sharex=True)
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(15, 15), sharex=True)
 
     for k, v in epochs.items():
         train_loss = []
         eval_loss = []
+        train_accuracy = []
+        eval_accuracy = []
         lr = []
         grad_norm = []
         for epoch in v:
             train_loss.append(epoch.train_loss)
             eval_loss.append(epoch.val_loss)
+            train_accuracy.append(epoch.train_accuracy)
+            eval_accuracy.append(epoch.val_accuracy)
             lr.append(epoch.lr)
             grad_norm.append(epoch.grad_norm)
 
         # Plot training and evaluation loss
         ax1.plot(train_loss, label=f"{k} Training Loss", linestyle="-")
         ax1.plot(eval_loss, label=f"{k} Evaluation Loss", linestyle="--")
-        ax1.set_ylabel("Loss")
-        ax1.set_title("Training and Evaluation Losses")
-        ax1.legend()
+
+        ax2.plot(train_accuracy, label=f"{k} Training Accuracy", linestyle="-")
+        ax2.plot(eval_accuracy, label=f"{k} Evaluation Accuracy", linestyle="--")
 
         # Plot grad_norm
-        ax2.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
-        ax2.set_ylabel("Gradient Norm")
-        ax2.set_title("Gradient Norm")
-        ax2.legend()
+        ax3.plot(grad_norm, label=f"{k} grad_norm", linestyle="-")
 
         # Plot learning rate
-        ax3.plot(lr, label=f"{k} lr", linestyle=":")
-        ax3.set_ylabel("Learning Rate")
-        ax3.set_title("Learning Rate")
-        ax3.legend()
+        ax4.plot(lr, label=f"{k} lr", linestyle=":")
+
+    ax1.set_ylabel("Loss")
+    ax1.set_title("Training and Evaluation Losses")
+    ax1.legend()
+
+    ax2.set_ylabel("Accuracy")
+    ax2.set_title("Training and Evaluation Accuracies")
+    ax2.legend()
+
+    ax3.set_ylabel("Gradient Norm")
+    ax3.set_title("Gradient Norm")
+    ax3.legend()
+
+    ax4.set_ylabel("Learning Rate")
+    ax4.set_title("Learning Rate")
+    ax4.legend()
+
+    # Add gridlines to all subplots
+    ax1.grid(True, linestyle="--", alpha=0.7)
+    ax2.grid(True, linestyle="--", alpha=0.7)
+    ax3.grid(True, linestyle="--", alpha=0.7)
+    ax4.grid(True, linestyle="--", alpha=0.7)
+    ax1.set_axisbelow(True)
+    ax2.set_axisbelow(True)
+    ax3.set_axisbelow(True)
+    ax4.set_axisbelow(True)
 
     plt.xlabel("Epoch")
     plt.tight_layout()
@@ -164,7 +200,7 @@ def visualize_mask(mask, title):
 def visualize_tensors(
     grids: torch.Tensor,
     output_grid: torch.Tensor,
-    prediction: torch.Tensor,
+    prediction: Optional[torch.Tensor],
 ):
     # Create a colormap from the list of colors
     cmap = mcolors.ListedColormap(COLORS)
@@ -220,8 +256,9 @@ def visualize_tensors(
     # Add prediction as a small subplot
     # pred_ax = fig.add_axes([0.75, 0.125, 0.2, 0.2])  # [left, bottom, width, height]
     # pred_ax.imshow(prediction.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    plot_grid(axes[-1, 2], prediction)
-    axes[-1, 2].set_title("Prediction")
+    if prediction is not None:
+        plot_grid(axes[-1, 2], prediction)
+        axes[-1, 2].set_title("Prediction")
 
     plt.tight_layout()
     plt.show()

@@ -19,7 +19,7 @@ data_volume = modal.Volume.from_name("arc-data")
 
 
 @modal_app.function(
-    gpu="t4",
+    gpu="A10G",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60),
 )
@@ -43,7 +43,7 @@ def train(
         )
         torch.save(model_state.__dict__, model_filename)
 
-    return train_arc_transformer(model_filename, num_epochs)
+    return train_arc_transformer(model_filename, num_epochs, train_params=train_params)
 
 
 @modal_app.function(volumes={"/vol/models": models_volume})
@@ -97,9 +97,15 @@ def evaluate_model(model_name: str, dataset_dir: list[str]):
                 "grids": grids.cpu().numpy(),
                 "output_grid": output_grid.cpu().numpy(),
                 "predictions": predictions.cpu().numpy(),
-                "encoder_attn_weights": encoder_attn_weights.cpu().numpy(),
-                "decoder_sa_attn_weights": decoder_sa_weights.cpu().numpy(),
-                "decoder_mha_attn_weights": decoder_mha_weights.cpu().numpy(),
+                "encoder_attn_weights": encoder_attn_weights.cpu().numpy()
+                if encoder_attn_weights
+                else None,
+                "decoder_sa_attn_weights": decoder_sa_weights.cpu().numpy()
+                if decoder_sa_weights
+                else None,
+                "decoder_mha_attn_weights": decoder_mha_weights.cpu().numpy()
+                if decoder_mha_weights
+                else None,
             }
         )
 

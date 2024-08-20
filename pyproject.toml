@@ -16,6 +16,7 @@ modal = "^0.63.92"
 tqdm = "^4.66.4"
 seaborn = "^0.13.2"
 petname = "^2.6"
+dataclasses-json = "^0.6.7"
 
 
 [build-system]

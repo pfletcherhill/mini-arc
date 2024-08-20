@@ -1,82 +1,10 @@
 import math
 from dataclasses import dataclass
-from json import decoder
 from typing import Optional
 
-# import matplotlib.pyplot as plt
-# import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-# def visualize_tensor(tensor, title="Tensor"):
-#     if not isinstance(tensor, torch.Tensor):
-#         raise ValueError("Input must be a PyTorch tensor")
-
-#     if tensor.dim() != 2:
-#         raise ValueError("Mask must have dim of 2")
-
-#     # Convert to numpy array
-#     mask_np = tensor.cpu().numpy()
-
-#     # Create the plot
-#     plt.figure(figsize=(12, 10))
-#     plt.imshow(mask_np, interpolation="nearest", aspect="auto")
-#     plt.title(title)
-#     plt.colorbar(label="Value")
-
-#     # Add labels
-#     plt.xlabel("Token Position")
-#     plt.ylabel("Token Position")
-
-#     plt.show()
-
-
-# def visualize_attention_mask(mask, title="Attention Mask"):
-#     if not isinstance(mask, torch.Tensor):
-#         raise ValueError("Input must be a PyTorch tensor")
-
-#     if mask.dim() != 2:
-#         raise ValueError("Mask must have dim of 2")
-
-#     # Convert to numpy array
-#     mask_np = mask.cpu().numpy()
-
-#     # Create the plot
-#     plt.figure(figsize=(12, 10))
-#     plt.imshow(mask_np, cmap="binary", interpolation="nearest", aspect="auto")
-#     plt.title(title)
-#     plt.colorbar(label="Attention")
-
-#     # Add labels
-#     plt.xlabel("Token Position")
-#     plt.ylabel("Token Position")
-
-#     plt.show()
-
-
-# def visualize_nan_patterns(tensor):
-#     if not isinstance(tensor, torch.Tensor):
-#         raise ValueError("Input must be a PyTorch tensor")
-
-#     if tensor.dim() != 3 or tensor.shape != (2, 900, 8):
-#         raise ValueError("Tensor must have shape [2, 900, 8]")
-
-#     # Convert tensor to numpy array and check for NaN values
-#     nan_mask = torch.isnan(tensor).numpy()
-
-#     fig, axs = plt.subplots(1, 2, figsize=(20, 10))
-#     fig.suptitle("NaN Value Patterns", fontsize=16)
-
-#     for i in range(2):
-#         im = axs[i].imshow(nan_mask[i], cmap="binary", aspect="auto")
-#         axs[i].set_title(f"Sample {i+1}")
-#         axs[i].set_xlabel("Feature")
-#         axs[i].set_ylabel("Sequence Position")
-#         plt.colorbar(im, ax=axs[i], label="Is NaN")
-
-#     plt.tight_layout()
-#     plt.show()
 
 
 @dataclass(frozen=True)
@@ -123,7 +51,8 @@ class EncoderLayerWithAttention(nn.TransformerEncoderLayer):
         src_mask: Optional[torch.Tensor] = None,
         src_key_padding_mask: Optional[torch.Tensor] = None,
         is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
@@ -148,7 +77,7 @@ class EncoderLayerWithAttention(nn.TransformerEncoderLayer):
             x,
             attn_mask=src_mask,
             key_padding_mask=src_key_padding_mask,
-            need_weights=True,
+            need_weights=need_weights,
             is_causal=is_causal,
             average_attn_weights=False,
         )
@@ -173,8 +102,8 @@ class EncoderWithAttention(nn.TransformerEncoder):
         src: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
         src_key_padding_mask: Optional[torch.Tensor] = None,
-        is_causal: Optional[bool] = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",
@@ -199,15 +128,16 @@ class EncoderWithAttention(nn.TransformerEncoder):
             output, layer_attn_weights = mod(
                 output,
                 src_mask=mask,
-                is_causal=is_causal,
                 src_key_padding_mask=src_key_padding_mask,
+                need_weights=need_weights,
             )
-            attn_weights.append(layer_attn_weights)
+            if need_weights:
+                attn_weights.append(layer_attn_weights)
 
         if self.norm is not None:
             output = self.norm(output)
 
-        return output, torch.stack(attn_weights, dim=1)
+        return output, (torch.stack(attn_weights, dim=1) if need_weights else None)
 
 
 class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
@@ -230,15 +160,25 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
         memory_key_padding_mask: Optional[torch.Tensor] = None,
         tgt_is_causal: bool = False,
         memory_is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
         x = tgt
         x_sa, sa_attn_weights = self._sa_block(
-            x, tgt_mask, tgt_key_padding_mask, tgt_is_causal
+            x,
+            tgt_mask,
+            tgt_key_padding_mask,
+            is_causal=tgt_is_causal,
+            need_weights=need_weights,
         )
         x = self.norm1(x + x_sa)
 
         x_mha, mha_attn_weights = self._mha_block(
-            x, memory, memory_mask, memory_key_padding_mask, memory_is_causal
+            x,
+            memory,
+            memory_mask,
+            memory_key_padding_mask,
+            is_causal=memory_is_causal,
+            need_weights=need_weights,
         )
         x = self.norm2(x + x_mha)
         x = self.norm3(x + self._ff_block(x))
@@ -252,7 +192,8 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
         attn_mask: Optional[torch.Tensor],
         key_padding_mask: Optional[torch.Tensor],
         is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         x, sa_attn_weights = self.self_attn(
             x,
             x,
@@ -260,7 +201,7 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
             attn_mask=attn_mask,
             key_padding_mask=key_padding_mask,
             is_causal=is_causal,
-            need_weights=True,
+            need_weights=need_weights,
             average_attn_weights=False,
         )
         return self.dropout1(x), sa_attn_weights
@@ -273,7 +214,8 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
         attn_mask: Optional[torch.Tensor],
         key_padding_mask: Optional[torch.Tensor],
         is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         x, mha_attn_weights = self.multihead_attn(
             x,
             mem,
@@ -281,7 +223,7 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
             attn_mask=attn_mask,
             key_padding_mask=key_padding_mask,
             is_causal=is_causal,
-            need_weights=True,
+            need_weights=need_weights,
             average_attn_weights=False,
         )
         return self.dropout2(x), mha_attn_weights
@@ -308,9 +250,10 @@ class DecoderWithAttention(nn.TransformerDecoder):
         memory_mask: Optional[torch.Tensor] = None,
         tgt_key_padding_mask: Optional[torch.Tensor] = None,
         memory_key_padding_mask: Optional[torch.Tensor] = None,
-        tgt_is_causal: Optional[bool] = None,
+        tgt_is_causal: Optional[bool] = False,
         memory_is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
         output = tgt
 
         sa_attn_weights = []
@@ -326,17 +269,19 @@ class DecoderWithAttention(nn.TransformerDecoder):
                 memory_key_padding_mask=memory_key_padding_mask,
                 tgt_is_causal=tgt_is_causal,
                 memory_is_causal=memory_is_causal,
+                need_weights=need_weights,
             )
-            sa_attn_weights.append(layer_sa_attn_weights)
-            mha_attn_weights.append(layer_mha_attn_weights)
+            if need_weights:
+                sa_attn_weights.append(layer_sa_attn_weights)
+                mha_attn_weights.append(layer_mha_attn_weights)
 
         if self.norm is not None:
             output = self.norm(output)
 
         return (
             output,
-            torch.stack(sa_attn_weights, dim=1),
-            torch.stack(mha_attn_weights, dim=1),
+            torch.stack(sa_attn_weights, dim=1) if need_weights else None,
+            torch.stack(mha_attn_weights, dim=1) if need_weights else None,
         )
 
 
@@ -409,8 +354,13 @@ class ARCTransformerEncoderDecoder(nn.Module):
         self.output_layer = nn.Linear(self.d_model, self.num_classes)
 
     def forward(
-        self, src, src_mask
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self, src: torch.Tensor, src_mask: torch.Tensor, need_weights: bool = False
+    ) -> tuple[
+        torch.Tensor,
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+    ]:
         # src shape: (batch_size, num_input_grids, grid_dim, grid_dim)
         batch_size = src.shape[0]
 
@@ -425,16 +375,23 @@ class ARCTransformerEncoderDecoder(nn.Module):
         # Encode input
         padding_mask = ~src_mask.view(batch_size, -1)
 
-        memory, encoder_attn_weights = self.encoder(
-            src, src_key_padding_mask=padding_mask
+        memory, encoder_attn_weights = self.encoder.forward(
+            src, src_key_padding_mask=padding_mask, need_weights=need_weights
         )
 
         # Prepare output query
         output_query = self.output_query.expand(batch_size, -1, -1)
 
         # Decode
-        output, decoder_sa_attn_weights, decoder_mha_attn_weights = self.decoder(
-            output_query, memory, memory_key_padding_mask=padding_mask
+        (
+            output,
+            decoder_sa_attn_weights,
+            decoder_mha_attn_weights,
+        ) = self.decoder.forward(
+            output_query,
+            memory,
+            memory_key_padding_mask=padding_mask,
+            need_weights=need_weights,
         )
 
         # Generate output grid
@@ -452,15 +409,23 @@ class ARCTransformerEncoderDecoder(nn.Module):
 
     # TODO: potentially add temperature arg
     def generate(
-        self, src, src_mask=None
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        need_weights: bool = False,
+    ) -> tuple[
+        torch.Tensor,
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+    ]:
         with torch.no_grad():
             (
                 output,
                 encoder_attn_weights,
                 decoder_sa_attn_weights,
                 decoder_mha_attn_weights,
-            ) = self.forward(src, src_mask)
+            ) = self.forward(src, src_mask, need_weights)
             # print("output shape", output.shape)
             # print("output sample", output[0, 0, 0])
             return (

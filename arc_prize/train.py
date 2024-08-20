@@ -12,8 +12,6 @@ from arc_prize.data import (
 from arc_prize.model import (
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
-    ARCTransformerMaskedEncoderDecoder,
-    ARCTransformerMaskedEncoderDecoderParams,
 )
 
 
@@ -23,6 +21,7 @@ class ARCTrainParams:
     learning_rate: float
     weight_decay: float
     dataset_dir: list[str]
+    loss_class_weights: Optional[dict[int, float]] = None
 
 
 @dataclass(frozen=True)
@@ -68,7 +67,12 @@ def calculate_param_norm(model: ARCTransformerEncoderDecoder):
     return total_norm**0.5
 
 
-def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 10):
+def train_arc_transformer(
+    model_filename: str,
+    num_epochs: int,
+    patience: int = 10,
+    train_params: Optional[ARCTrainParams] = None,
+):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     torch.backends.mha.set_fastpath_enabled(False)
@@ -85,19 +89,22 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
         max_train_grids=model.num_train_pairs,
         color_offset=1,
     )
-    # dataset_dir = f"/vol/data/{checkpoint.train_params.dataset_name}"
+
     train_loader, val_loader = make_data_loaders(
         checkpoint.train_params.dataset_dir,
         checkpoint.train_params.batch_size,
         dataset_params,
     )
 
+    train_params = train_params or checkpoint.train_params
+
     class_weights = torch.ones(model.num_classes).to(device)
-    class_weights[0] = 0.1
-    class_weights[1] = 1.2
+    if train_params.loss_class_weights is not None:
+        for cls, weight in train_params.loss_class_weights.items():
+            class_weights[cls] = weight
+
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-    train_params = checkpoint.train_params
     optimizer = optim.AdamW(
         model.parameters(),
         lr=train_params.learning_rate,
@@ -127,7 +134,7 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
             grids, masks, target_grid = [item.to(device) for item in batch]
 
             optimizer.zero_grad()
-            output, _ = model(grids, masks)
+            output = model.forward(grids, masks)[0]
 
             loss = criterion(
                 output.view(-1, model.num_classes), target_grid.view(-1).long()
@@ -157,7 +164,7 @@ def train_arc_transformer(model_filename: str, num_epochs: int, patience: int = 
                 # grids, masks, target_grid = batch
                 grids, masks, target_grid = [item.to(device) for item in batch]
 
-                output, encoder_attn_weights = model(grids, masks)
+                output = model.forward(grids, masks)[0]
                 loss = criterion(
                     output.view(-1, model.num_classes), target_grid.view(-1).long()
                 )
@@ -243,4 +250,4 @@ def train_on_mac(
         )
         torch.save(model_state.__dict__, model_filename)
 
-    return train_arc_transformer(model_filename, num_epochs)
+    return train_arc_transformer(model_filename, num_epochs, train_params=train_params)
