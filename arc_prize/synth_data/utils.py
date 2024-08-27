@@ -61,7 +61,7 @@ class DatasetInterface(ABC):
     def generate_task(self) -> tuple[list[GridPair], GridPair]:
         pass
 
-    def generate_tasks(self, num_tasks: int) -> DatasetTasks:
+    def generate_full_tasks(self, num_tasks: int) -> DatasetTasks:
         task_prefix = self.__class__.__name__.lower()
         challenges: dict[str, ChallengeTask] = {}
         solutions: dict[str, list[list]] = {}

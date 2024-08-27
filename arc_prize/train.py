@@ -8,10 +8,12 @@ import torch.optim as optim
 from arc_prize.data import (
     ARCDatasetParams,
     make_data_loaders,
+    make_re_arc_data_loaders,
 )
 from arc_prize.model import (
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
+    ARCVisionEncoderDecoder,
 )
 
 
@@ -72,21 +74,28 @@ def train_arc_transformer(
     num_epochs: int,
     patience: int = 10,
     train_params: Optional[ARCTrainParams] = None,
-):
+) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     torch.backends.mha.set_fastpath_enabled(False)
 
-    checkpoint_dict = torch.load(model_filename)
+    checkpoint_dict = torch.load(model_filename, weights_only=False)
     checkpoint = ARCModelState(**checkpoint_dict)
 
-    model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
+    # model = ARCTransformerEncoderDecoder(checkpoint.model_params)
+    model = ARCVisionEncoderDecoder(checkpoint.model_params)
     if checkpoint.model_state_dict is not None:
         model.load_state_dict(checkpoint.model_state_dict)
 
+    parallel_model = nn.DataParallel(model)
+
+    print(f"Using {torch.cuda.device_count()} GPUs in parallel")
+
+    parallel_model = parallel_model.to(device)
+
     dataset_params = ARCDatasetParams(
-        max_grid_size=model.grid_dim,
-        max_train_grids=model.num_train_pairs,
+        max_grid_size=parallel_model.module.grid_dim,
+        max_train_grids=parallel_model.module.num_train_pairs,
         color_offset=1,
     )
 
@@ -95,10 +104,19 @@ def train_arc_transformer(
         checkpoint.train_params.batch_size,
         dataset_params,
     )
+    # train_loader, val_loader = make_re_arc_data_loaders(
+    #     checkpoint.train_params.dataset_dir,
+    #     checkpoint.train_params.batch_size,
+    #     dataset_params,
+    # )
+
+    print(
+        f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items"
+    )
 
     train_params = train_params or checkpoint.train_params
 
-    class_weights = torch.ones(model.num_classes).to(device)
+    class_weights = torch.ones(parallel_model.module.num_classes).to(device)
     if train_params.loss_class_weights is not None:
         for cls, weight in train_params.loss_class_weights.items():
             class_weights[cls] = weight
@@ -106,7 +124,7 @@ def train_arc_transformer(
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     optimizer = optim.AdamW(
-        model.parameters(),
+        parallel_model.parameters(),
         lr=train_params.learning_rate,
         weight_decay=train_params.weight_decay,
     )
@@ -125,7 +143,7 @@ def train_arc_transformer(
     epochs_without_improvement = 0
 
     for epoch in range(len(checkpoint.epochs), total_epochs):
-        model.train()
+        parallel_model.train()
         train_loss = 0.0
         train_accuracy = 0.0
 
@@ -134,10 +152,11 @@ def train_arc_transformer(
             grids, masks, target_grid = [item.to(device) for item in batch]
 
             optimizer.zero_grad()
-            output = model.forward(grids, masks)[0]
+            output = parallel_model.forward(grids, masks)[0]
 
             loss = criterion(
-                output.view(-1, model.num_classes), target_grid.view(-1).long()
+                output.view(-1, parallel_model.module.num_classes),
+                target_grid.view(-1).long(),
             )
             loss.backward()
 
@@ -156,7 +175,7 @@ def train_arc_transformer(
         train_accuracy /= len(train_loader)
 
         # Validation
-        model.eval()
+        parallel_model.eval()
         val_loss = 0.0
         val_accuracy = 0.0
         with torch.no_grad():
@@ -164,9 +183,10 @@ def train_arc_transformer(
                 # grids, masks, target_grid = batch
                 grids, masks, target_grid = [item.to(device) for item in batch]
 
-                output = model.forward(grids, masks)[0]
+                output = parallel_model.forward(grids, masks)[0]
                 loss = criterion(
-                    output.view(-1, model.num_classes), target_grid.view(-1).long()
+                    output.view(-1, parallel_model.module.num_classes),
+                    target_grid.view(-1).long(),
                 )
 
                 val_loss += loss.item()
@@ -194,8 +214,8 @@ def train_arc_transformer(
                 beta2=beta2,
                 epsilon=param_group["eps"],
                 weight_decay=param_group["weight_decay"],
-                grad_norm=calculate_grad_norm(model),
-                param_norm=calculate_param_norm(model),
+                grad_norm=calculate_grad_norm(parallel_model),
+                param_norm=calculate_param_norm(parallel_model),
             )
         )
 
@@ -210,7 +230,7 @@ def train_arc_transformer(
         # Save the best model
         if val_loss < checkpoint.best_val_loss:
             checkpoint.best_val_loss = val_loss
-            checkpoint.model_state_dict = model.state_dict()
+            checkpoint.model_state_dict = parallel_model.module.state_dict()
             # checkpoint.encoder_attn_weights = encoder_attn_weights
             epochs_without_improvement = 0
             print("New best val loss", val_loss)
@@ -227,7 +247,6 @@ def train_arc_transformer(
             break
 
     print("Training completed")
-    return model
 
 
 def train_on_mac(

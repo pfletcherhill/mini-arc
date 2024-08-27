@@ -639,6 +639,256 @@ class ARCTransformerMaskedEncoderDecoder(nn.Module):
             return torch.argmax(output, dim=-1)
 
 
+class HybridPatchEmbedding(nn.Module):
+    def __init__(
+        self,
+        num_classes: int,
+        patch_size: int,
+        num_train_pairs: int,
+        embed_dim: int,
+        grid_dim: int,
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+        self.grid_dim = grid_dim
+        self.num_train_pairs = num_train_pairs
+
+        # Color embedding
+        self.color_embedding = nn.Embedding(self.num_classes, self.embed_dim)
+
+        # Convolutional layer for patch embedding
+        self.conv_embed = nn.Conv2d(
+            in_channels=self.embed_dim,
+            out_channels=self.embed_dim,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
+        )
+
+        # Positional embedding
+        num_grids = self.num_train_pairs * 2 + 1
+        self.num_patches = (num_grids * self.grid_dim // self.patch_size) * (
+            self.grid_dim // self.patch_size
+        )
+        self.pos_embedding = nn.Parameter(
+            torch.randn(1, self.num_patches, self.embed_dim)
+        )
+
+    def forward(
+        self, x: torch.Tensor, mask: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # x shape: (batch_size, grid_size, grid_size)
+        batch_size = x.shape[0]
+
+        # Color embedding
+        x = self.color_embedding(x)
+
+        # Reshape for convolutional layer
+        x = x.float().permute(0, 3, 1, 2)  # (batch_size, embed_dim, height, width)
+
+        # Patch embedding using convolution
+        x = self.conv_embed(x)
+
+        # Reshape for positional embedding
+        x = x.permute(0, 2, 3, 1).reshape(batch_size, -1, self.embed_dim)
+
+        # Add positional embedding
+        x += self.pos_embedding
+
+        # Patch mask
+
+        mask = nn.functional.avg_pool2d(
+            mask.float(),
+            self.patch_size,
+            stride=self.patch_size,
+        )
+
+        mask = (mask > 0).reshape(batch_size, -1)
+
+        return (x, mask)
+
+
+class ConcatPatchEmbedding(nn.Module):
+    def __init__(
+        self,
+        num_classes: int,
+        patch_size: int,
+        num_train_pairs: int,
+        embed_dim: int,
+        grid_dim: int,
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+        self.grid_dim = grid_dim
+        self.num_train_pairs = num_train_pairs
+
+        # Color embedding
+        self.color_embed_dim = embed_dim // 2
+        self.color_embedding = nn.Embedding(self.num_classes, self.color_embed_dim)
+
+        # Convolutional layer for patch embedding
+        self.conv_embed = nn.Conv2d(
+            in_channels=self.color_embed_dim,
+            out_channels=(self.embed_dim - self.color_embed_dim),
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
+        )
+
+        # Positional embedding
+        num_grids = self.num_train_pairs * 2 + 1
+        self.num_patches = (num_grids * self.grid_dim // self.patch_size) * (
+            self.grid_dim // self.patch_size
+        )
+        self.pos_embedding = nn.Parameter(
+            torch.randn(1, self.num_patches, self.embed_dim)
+        )
+
+    def forward(
+        self, x: torch.Tensor, mask: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # x shape: (batch_size, grid_size, grid_size)
+        batch_size = x.shape[0]
+
+        # Color embedding
+        color_embed = self.color_embedding(x).float()
+
+        # Reshape for convolutional layer
+        x = color_embed.permute(0, 3, 1, 2)  # (batch_size, embed_dim, height, width)
+
+        # Patch embedding using convolution
+        patch_embed = self.conv_embed(x)
+
+        # Reshape for positional embedding
+        patch_embed = patch_embed.permute(0, 2, 3, 1).reshape(
+            batch_size, -1, self.embed_dim
+        )
+
+        combined_embed = torch.cat([color_embed, patch_embed])
+
+        # Add positional embedding
+        combined_embed += self.pos_embedding
+
+        # Patch mask
+
+        mask = nn.functional.avg_pool2d(
+            mask.float(),
+            self.patch_size,
+            stride=self.patch_size,
+        )
+
+        mask = (mask > 0).reshape(batch_size, -1)
+
+        return (combined_embed, mask)
+
+
+class ARCVisionEncoderDecoder(nn.Module):
+    def __init__(self, params: ARCTransformerEncoderDecoderParams):
+        super().__init__()
+        self.grid_dim = params.grid_dim
+        self.num_train_pairs = params.num_train_pairs
+        self.num_classes = params.num_colors + 1
+        self.d_model = params.d_model
+        self.num_encoder_layers = params.num_encoder_layers
+        self.num_decoder_layers = params.num_decoder_layers
+        self.num_heads = params.num_heads
+        self.d_ff = params.d_ff
+        self.dropout = params.dropout
+        self.patch_size = 2
+
+        num_grids = self.num_train_pairs * 2 + 1
+        self.seq_len = (num_grids * self.grid_dim // self.patch_size) * (
+            self.grid_dim // self.patch_size
+        )
+
+        self.embedding = HybridPatchEmbedding(
+            num_classes=self.num_classes,
+            patch_size=self.patch_size,
+            num_train_pairs=self.num_train_pairs,
+            embed_dim=self.d_model,
+            grid_dim=self.grid_dim,
+        )
+
+        encoder_layer = EncoderLayerWithAttention(
+            self.d_model, self.num_heads, self.d_ff, self.dropout
+        )
+        self.encoder = EncoderWithAttention(encoder_layer, self.num_encoder_layers)
+
+        decoder_layer = DecoderLayerWithAttention(
+            self.d_model, self.num_heads, self.d_ff, self.dropout
+        )
+        self.decoder = DecoderWithAttention(decoder_layer, self.num_decoder_layers)
+
+        self.output_query = nn.Parameter(
+            torch.randn(1, self.grid_dim * self.grid_dim, self.d_model)
+        )
+        self.output_layer = nn.Linear(self.d_model, self.num_classes)
+
+    def forward(
+        self, src: torch.Tensor, src_mask: torch.Tensor, need_weights: bool = False
+    ):
+        batch_size, num_grids, grid_dim, grid_dim = src.shape
+
+        # Flatten grids
+        src = src.reshape(batch_size, num_grids * grid_dim, grid_dim)
+        src_mask = src_mask.reshape(batch_size, num_grids * grid_dim, grid_dim)
+
+        # Apply hybrid embedding
+        src_patches, mask_patches = self.embedding.forward(src, src_mask)
+
+        # Create padding mask
+
+        padding_mask = ~mask_patches
+
+        # Encode input
+        memory, encoder_attn_weights = self.encoder(
+            src_patches, src_key_padding_mask=padding_mask, need_weights=need_weights
+        )
+
+        # Prepare output query
+        output_query = self.output_query.expand(batch_size, -1, -1)
+
+        # Decode
+        output, decoder_sa_attn_weights, decoder_mha_attn_weights = self.decoder(
+            output_query,
+            memory,
+            memory_key_padding_mask=padding_mask,
+            need_weights=need_weights,
+        )
+
+        # Generate output patches
+        output = self.output_layer(output)
+
+        # Reshape to grid
+        output = output.view(batch_size, self.grid_dim, self.grid_dim, self.num_classes)
+
+        return (
+            output,
+            encoder_attn_weights,
+            decoder_sa_attn_weights,
+            decoder_mha_attn_weights,
+        )
+
+    def generate(
+        self, src: torch.Tensor, src_mask: torch.Tensor, need_weights: bool = False
+    ):
+        with torch.no_grad():
+            (
+                output,
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            ) = self.forward(src, src_mask, need_weights)
+            return (
+                torch.argmax(output, dim=-1),
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            )
+
+
 class ARCPositionalEncoding(nn.Module):
     def __init__(self, d_model: int, grid_dim: int, num_train_pairs: int):
         super().__init__()

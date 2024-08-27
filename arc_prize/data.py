@@ -1,9 +1,9 @@
 import json
+import random
 from dataclasses import dataclass
 
-import numpy as np
 import torch
-from torch.utils.data import ConcatDataset, DataLoader, Dataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,6 @@ class ARCDataset(Dataset):
     def __init__(
         self, challenges_file: str, solutions_file: str, config: ARCDatasetParams
     ):
-        # self.challenges_file = challenges_file
-        # self.solutions_file = solutions_file
         with open(challenges_file, "r") as f:
             self.challenges = json.load(f)
             self.task_ids = list(self.challenges.keys())
@@ -63,13 +61,10 @@ class ARCDataset(Dataset):
 
     def __len__(self):
         return len(self.task_ids)
-        # return len(self.challenges.keys())
 
     def __getitem__(self, idx) -> dict:
         task_id = self.task_ids[idx]
-        # challenge = get_task_from_file(self.challenges_file, task_id)
         challenge = self.challenges[task_id]
-        # solution = get_task_from_file(self.solutions_file, task_id)
         solution = self.solutions[task_id]
 
         grids = torch.zeros(
@@ -106,6 +101,69 @@ class ARCDataset(Dataset):
 
         return {
             "task_id": task_id,
+            "grids": grids,
+            "masks": masks,
+            "output": test_output_grid,
+        }
+
+
+class ReARCDataset(Dataset):
+    tasks: list
+    config: ARCDatasetParams
+
+    def __init__(self, tasks_file: str, config: ARCDatasetParams):
+        with open(tasks_file, "r") as f:
+            self.tasks = json.load(f)
+        self.config = config
+
+    def __len__(self):
+        return len(self.tasks)
+
+    def __getitem__(self, idx) -> dict:
+        num_train_pairs = random.randint(1, self.config.max_train_grids)
+        train_task_idxs = set()
+        while len(train_task_idxs) < num_train_pairs:
+            task_idx = random.randint(0, len(self.tasks) - 1)
+            if task_idx != idx:
+                train_task_idxs.add(task_idx)
+        train_tasks = [self.tasks[task_idx] for task_idx in train_task_idxs]
+
+        grids = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.int,
+        )
+        masks = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.bool,
+        )
+
+        for i, pair in enumerate(train_tasks):
+            if i >= self.config.max_train_grids:
+                raise Exception(
+                    "Training pairs exceed max", i, self.config.max_train_grids
+                )
+            input_grid, input_mask = pad_and_mask_grid(pair["input"], self.config)
+            grids[2 * i] = input_grid
+            masks[2 * i] = input_mask
+            output_grid, output_mask = pad_and_mask_grid(pair["output"], self.config)
+            grids[2 * i + 1] = output_grid
+            masks[2 * i + 1] = output_mask
+
+        test_task = self.tasks[idx]
+
+        test_input_grid, test_input_mask = pad_and_mask_grid(
+            test_task["input"], self.config
+        )
+        grids[-1] = test_input_grid
+        masks[-1] = test_input_mask
+        test_output_grid = pad_and_mask_grid(test_task["output"], self.config)[0]
+
+        return {
+            "task_id": f"{idx}",
             "grids": grids,
             "masks": masks,
             "output": test_output_grid,
@@ -156,7 +214,44 @@ def make_data_loaders(
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=True,
+        collate_fn=collate_arc_fn,
+        num_workers=0,
+    )
+
+    return (train_loader, val_loader)
+
+
+def make_re_arc_data_loaders(
+    dataset_files: list[str], batch_size: int, params: ARCDatasetParams
+) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
+    datasets: list[Dataset] = []
+
+    for file_path in dataset_files:
+        dataset = ReARCDataset(
+            file_path,
+            config=params,
+        )
+        datasets.append(dataset)
+
+    val_ratio = 0.25
+    train_ratio = 1 - val_ratio
+    train_dataset, val_dataset = random_split(
+        ConcatDataset(datasets), lengths=[train_ratio, val_ratio]
+    )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=collate_arc_fn,
+        num_workers=0,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=True,
         collate_fn=collate_arc_fn,
         num_workers=0,
     )

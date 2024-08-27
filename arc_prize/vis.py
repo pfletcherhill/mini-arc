@@ -1,3 +1,4 @@
+from statistics import median_grouped
 from typing import Optional
 
 import matplotlib.colors as mcolors
@@ -369,6 +370,46 @@ def visualize_mean_sa_attention(attn_weights: torch.Tensor, grid_dim: int = 10):
 
         # Add colorbar for each grid
         # plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+        # Remove ticks from the main subplot
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_mean_attention(attention_weights, num_grids=9, grid_size=10):
+    # Reshape the attention weights
+    # From [4, 100, 900] to [4, 100, 9, 10, 10]
+    num_heads = attention_weights.shape[0]
+    reshaped_attention = attention_weights.view(
+        num_heads, -1, num_grids, grid_size, grid_size
+    )
+
+    # Calculate mean attention across the target sequence (dim=1)
+    # mean_attention = reshaped_attention.mean(dim=1)  # Shape: [4, 9, 10, 10]
+    mean_attention = reshaped_attention
+
+    # Create a figure with subplots for each head
+    fig, axes = plt.subplots(4, 9, figsize=(20, 10))
+
+    for head in range(4):
+        # Create a 3x3 grid of heatmaps
+        for i in range(9):
+            grid_attention = mean_attention[head, i]
+
+            # Add subplot within the head's subplot
+            # sub_ax = ax.inset_axes([1/9])
+            ax = axes[head, i]
+            im = ax.imshow(grid_attention, cmap="viridis", interpolation="nearest")
+            ax.axis("off")
+
+            if i == 0:
+                ax.set_ylabel(f"Head {head + 1}", rotation=0, ha="right", va="center")
+
+            # Add colorbar for each grid
+            # plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
         # Remove ticks from the main subplot
         ax.set_xticks([])
