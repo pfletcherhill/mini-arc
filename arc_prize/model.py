@@ -709,7 +709,7 @@ class HybridPatchEmbedding(nn.Module):
         return (x, mask)
 
 
-class ConcatPatchEmbedding(nn.Module):
+class PatchEmbedding(nn.Module):
     def __init__(
         self,
         num_classes: int,
@@ -725,14 +725,10 @@ class ConcatPatchEmbedding(nn.Module):
         self.grid_dim = grid_dim
         self.num_train_pairs = num_train_pairs
 
-        # Color embedding
-        self.color_embed_dim = embed_dim // 2
-        self.color_embedding = nn.Embedding(self.num_classes, self.color_embed_dim)
-
         # Convolutional layer for patch embedding
         self.conv_embed = nn.Conv2d(
-            in_channels=self.color_embed_dim,
-            out_channels=(self.embed_dim - self.color_embed_dim),
+            in_channels=1,
+            out_channels=self.embed_dim,
             kernel_size=self.patch_size,
             stride=self.patch_size,
         )
@@ -753,26 +749,18 @@ class ConcatPatchEmbedding(nn.Module):
         batch_size = x.shape[0]
 
         # Color embedding
-        color_embed = self.color_embedding(x).float()
-
-        # Reshape for convolutional layer
-        x = color_embed.permute(0, 3, 1, 2)  # (batch_size, embed_dim, height, width)
+        x = x.unsqueeze(dim=1).float()
 
         # Patch embedding using convolution
-        patch_embed = self.conv_embed(x)
+        x = self.conv_embed(x)
 
         # Reshape for positional embedding
-        patch_embed = patch_embed.permute(0, 2, 3, 1).reshape(
-            batch_size, -1, self.embed_dim
-        )
-
-        combined_embed = torch.cat([color_embed, patch_embed])
+        x = x.permute(0, 2, 3, 1).reshape(batch_size, -1, self.embed_dim)
 
         # Add positional embedding
-        combined_embed += self.pos_embedding
+        x += self.pos_embedding
 
         # Patch mask
-
         mask = nn.functional.avg_pool2d(
             mask.float(),
             self.patch_size,
@@ -781,7 +769,7 @@ class ConcatPatchEmbedding(nn.Module):
 
         mask = (mask > 0).reshape(batch_size, -1)
 
-        return (combined_embed, mask)
+        return (x, mask)
 
 
 class ARCVisionEncoderDecoder(nn.Module):
@@ -803,7 +791,7 @@ class ARCVisionEncoderDecoder(nn.Module):
             self.grid_dim // self.patch_size
         )
 
-        self.embedding = HybridPatchEmbedding(
+        self.embedding = PatchEmbedding(
             num_classes=self.num_classes,
             patch_size=self.patch_size,
             num_train_pairs=self.num_train_pairs,
