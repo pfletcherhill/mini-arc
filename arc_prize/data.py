@@ -1,6 +1,7 @@
 import json
 import random
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
@@ -13,18 +14,11 @@ class ARCDatasetParams:
     color_offset: int = 1
 
 
-def get_task_from_file(file_name: str, task_id: str) -> dict:
-    with open(file_name, "r") as f:
-        tasks = json.load(f)
-        return tasks[task_id]
-
-
 def pad_and_mask_grid(
     grid: list[list[int]], config: ARCDatasetParams
 ) -> tuple[torch.Tensor, torch.Tensor]:
     h, w = len(grid), len(grid[0])
     if h > config.max_grid_size or w > config.max_grid_size:
-        print("too large", h, w)
         raise Exception("grid size too large")
 
     padded = torch.zeros((config.max_grid_size, config.max_grid_size), dtype=torch.int)
@@ -44,28 +38,34 @@ def pad_and_mask_grid(
 
 
 class ARCDataset(Dataset):
-    challenges: dict
-    solutions: dict
+    challenges: dict[str, dict]
+    solutions: dict[str, list]
     task_ids: list[str]
     config: ARCDatasetParams
 
     def __init__(
-        self, challenges_file: str, solutions_file: str, config: ARCDatasetParams
+        self,
+        challenges_file: str,
+        config: ARCDatasetParams,
+        solutions_file: Optional[str] = None,
     ):
         with open(challenges_file, "r") as f:
             self.challenges = json.load(f)
             self.task_ids = list(self.challenges.keys())
-        with open(solutions_file, "r") as f:
-            self.solutions = json.load(f)
+        if solutions_file is not None:
+            with open(solutions_file, "r") as f:
+                self.solutions = json.load(f)
+        else:
+            self.solutions = {}
         self.config = config
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.task_ids)
 
-    def __getitem__(self, idx) -> dict:
+    def __getitem__(self, idx: int) -> dict:
         task_id = self.task_ids[idx]
         challenge = self.challenges[task_id]
-        solution = self.solutions[task_id]
+        solution = self.solutions.get(task_id, None)
 
         grids = torch.zeros(
             2 * self.config.max_train_grids + 1,
@@ -97,7 +97,11 @@ class ARCDataset(Dataset):
         )
         grids[-1] = test_input_grid
         masks[-1] = test_input_mask
-        test_output_grid = pad_and_mask_grid(solution[0], self.config)[0]
+        test_output_grid = (
+            pad_and_mask_grid(solution[0], self.config)[0]
+            if solution is not None
+            else None
+        )
 
         return {
             "task_id": task_id,
@@ -105,6 +109,72 @@ class ARCDataset(Dataset):
             "masks": masks,
             "output": test_output_grid,
         }
+
+
+class ARCKaggleDataset(Dataset):
+    challenges: dict[str, dict]
+    task_ids: list[str]
+    config: ARCDatasetParams
+
+    def __init__(
+        self,
+        challenges_file: str,
+        config: ARCDatasetParams,
+    ):
+        with open(challenges_file, "r") as f:
+            self.challenges = json.load(f)
+            self.task_ids = list(self.challenges.keys())
+        self.config = config
+
+    def __len__(self) -> int:
+        return len(self.task_ids)
+
+    def __getitem__(self, idx: int) -> dict:
+        task_id = self.task_ids[idx]
+        challenge = self.challenges[task_id]
+
+        grids = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.int,
+        )
+        masks = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.bool,
+        )
+
+        for i, pair in enumerate(challenge["train"]):
+            if i >= self.config.max_train_grids:
+                print(
+                    "Training pairs exceed max", task_id, i, self.config.max_train_grids
+                )
+                break
+
+            try:
+                input_grid, input_mask = pad_and_mask_grid(pair["input"], self.config)
+                output_grid, output_mask = pad_and_mask_grid(
+                    pair["output"], self.config
+                )
+                grids[2 * i] = input_grid
+                masks[2 * i] = input_mask
+                grids[2 * i + 1] = output_grid
+                masks[2 * i + 1] = output_mask
+            except Exception as e:
+                print("Got exception for training pair", task_id, i, e)
+
+        try:
+            test_input_grid, test_input_mask = pad_and_mask_grid(
+                challenge["test"][0]["input"], self.config
+            )
+            grids[-1] = test_input_grid
+            masks[-1] = test_input_mask
+        except Exception as e:
+            print("Got exception on test input", task_id, e)
+
+        return {"task_id": task_id, "grids": grids, "masks": masks}
 
 
 class ReARCDataset(Dataset):
@@ -189,13 +259,13 @@ def make_data_loaders(
     for dir in dataset_dir:
         train_dataset = ARCDataset(
             f"{dir}/training_challenges.json",
-            f"{dir}/training_solutions.json",
+            solutions_file=f"{dir}/training_solutions.json",
             config=params,
         )
         train_datasets.append(train_dataset)
         val_dataset = ARCDataset(
             f"{dir}/evaluation_challenges.json",
-            f"{dir}/evaluation_solutions.json",
+            solutions_file=f"{dir}/evaluation_solutions.json",
             config=params,
         )
         val_datasets.append(val_dataset)

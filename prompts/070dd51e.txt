@@ -1,0 +1,7 @@
+- Grid sizes for all input and output pairs should be the same
+- For each pair, pick grid size between 10x10 and 30x30, though does not have to be square
+- Pick a hierarchy for the grids—either horizontal or vertical.
+- Pick a background color for all the grids. In most cases the background color should be black.
+- For each output grid, add 3-8 lines. The lines should be 1px in width, 5-20px in length, and either be aligned vertically or horizontally. Lines should not be the background color. Lines should not extend beyond the edge of the grid. Each line should be a different color. No two lines should have their endpoints overlap. If lines do overlap, use the hierarchy picked above to determine whether vertical lines go over horizontal lines or vice versa.
+- For each input grid, copy the same lines from the corresponding output grid, including their position and color. However, instead of showing the whole line, show only a 1px dot at each endpoint of the line in the same color as the line.
+- Each input grid should be made up of 1px dots, and each output grid should be made up of lines that connect the dots. 

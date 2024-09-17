@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00576224</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      (function () {
+        const colors = [
+          "#111111", // black
+          "#1E93FF", // blue
+          "#F93C31", // red
+          "#4FCC30", // green
+          "#FFDC00", // yellow
+          "#E6E6E6", // grey
+          "#E53AA3", // magenta
+          "#FF851B", // orange
+          "#87D8F1", // light blue
+          "#921231", // maroon
+        ];
+
+        const main = document.querySelector("main");
+
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random integer between 2 and 5 inclusive
+
+        const repeatX = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        const repeatY = Math.floor(Math.random() * 2) + 2; // 2 or 3
+
+        // For grid square size, assuming each square is 5x5 px
+        const squareSize = 5;
+
+        // For output grid, total squares in width and height must not exceed 6 (since 6*5=30)
+        const maxTotalSquaresX = 6;
+        const maxTotalSquaresY = 6;
+
+        // So max w = floor(maxTotalSquaresX / repeatX)
+        const maxW = Math.min(5, Math.floor(maxTotalSquaresX / repeatX));
+        const maxH = Math.min(5, Math.floor(maxTotalSquaresY / repeatY));
+
+        // Min w and h is 2
+        const minW = 2;
+        const minH = 2;
+
+        for (let i = 1; i <= numPairs; i++) {
+          // Generate random w and h within constraints
+          const w = Math.floor(Math.random() * (maxW - minW + 1)) + minW;
+          const h = Math.floor(Math.random() * (maxH - minH + 1)) + minH;
+
+          // Select 2-3 colors excluding black (index 0)
+          const colorIndices = [];
+          while (colorIndices.length < 2) {
+            const idx = Math.floor(Math.random() * (colors.length - 1)) + 1;
+            if (!colorIndices.includes(idx)) {
+              colorIndices.push(idx);
+            }
+          }
+          // Maybe add a third color
+          if (Math.random() < 0.5 && colorIndices.length < 3) {
+            let idx;
+            do {
+              idx = Math.floor(Math.random() * (colors.length - 1)) + 1;
+            } while (colorIndices.includes(idx));
+            colorIndices.push(idx);
+          }
+          const selectedColors = colorIndices.map((idx) => colors[idx]);
+
+          // Generate input grid data
+          const inputGridData = [];
+          for (let y = 0; y < h; y++) {
+            const row = [];
+            for (let x = 0; x < w; x++) {
+              const color =
+                selectedColors[
+                  Math.floor(Math.random() * selectedColors.length)
+                ];
+              row.push(color);
+            }
+            inputGridData.push(row);
+          }
+
+          // Create pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create input container
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.className = "grid";
+          inputGrid.style.width = w * squareSize + "px";
+          inputGrid.style.height = h * squareSize + "px";
+          inputGrid.style.position = "relative";
+
+          // Fill input grid
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const cell = document.createElement("div");
+              cell.style.position = "absolute";
+              cell.style.left = x * squareSize + "px";
+              cell.style.top = y * squareSize + "px";
+              cell.style.width = squareSize + "px";
+              cell.style.height = squareSize + "px";
+              cell.style.backgroundColor = inputGridData[y][x];
+              inputGrid.appendChild(cell);
+            }
+          }
+          inputContainer.appendChild(inputGrid);
+
+          // Create output container
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.className = "grid";
+          outputGrid.style.width = w * repeatX * squareSize + "px";
+          outputGrid.style.height = h * repeatY * squareSize + "px";
+          outputGrid.style.position = "relative";
+
+          // Fill output grid by repeating input grid
+          for (let ry = 0; ry < repeatY; ry++) {
+            for (let rx = 0; rx < repeatX; rx++) {
+              for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                  const cell = document.createElement("div");
+                  cell.style.position = "absolute";
+                  cell.style.left = (rx * w + x) * squareSize + "px";
+                  cell.style.top = (ry * h + y) * squareSize + "px";
+                  cell.style.width = squareSize + "px";
+                  cell.style.height = squareSize + "px";
+                  cell.style.backgroundColor = inputGridData[y][x];
+                  outputGrid.appendChild(cell);
+                }
+              }
+            }
+          }
+          outputContainer.appendChild(outputGrid);
+
+          // Append to pairDiv
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pairDiv to main
+          main.appendChild(pairDiv);
+        }
+      })();
+    </script>
+  </body>
+</html>

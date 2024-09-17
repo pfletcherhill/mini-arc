@@ -1,0 +1,4 @@
+- For each pair, add an input grid with a size between 2x2 px and 5x5 px. The grid does not have to be square. Fill the input grid with a random pattern using 2-3 colors, except black.
+- Then add an output grid for each pair, which is a repeated version of the input grid. The pattern should be repeated 2-3 times horizontally and 2-3 times vertically. Every pair in the puzzle should have the same number of repeats.
+- When repeating the input grid, do not scale it up or down.
+- No grid should be larger than 30x30 px.

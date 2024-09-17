@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0607ce86</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+        height: 30px;
+        width: 30px;
+      }
+      .grid {
+        position: relative;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main-content">
+      <!-- Pairs will be generated here -->
+    </main>
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const main = document.getElementById("main-content");
+
+      const numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+      // Pick background color (mostly black)
+      let backgroundColor;
+      const randomColorIndex = Math.random();
+      if (randomColorIndex < 0.8) {
+        backgroundColor = "#111111"; // black
+      } else {
+        backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      for (let i = 1; i <= numPairs; i++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.classList.add("pair");
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.classList.add("container");
+
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+        inputGrid.id = `input-${i}`;
+        inputContainer.appendChild(inputGrid);
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.classList.add("container");
+
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+        outputGrid.id = `output-${i}`;
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        main.appendChild(pairDiv);
+
+        // Generate grid size between 20 and 30 px
+        const gridSize = Math.floor(Math.random() * 11) + 20; // 20 to 30
+
+        // Set size of input and output grids
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        inputGrid.style.backgroundColor = backgroundColor;
+        outputGrid.style.backgroundColor = backgroundColor;
+
+        // Generate squares for output grid
+        const squareSize = Math.floor(Math.random() * 3) + 4; // 4 to 6
+        const numRows = Math.floor(Math.random() * 2) + 2; // 2 to 3
+        const numCols = Math.floor(Math.random() * 2) + 2; // 2 to 3
+        const spacing = Math.floor(Math.random() * 2) + 1; // 1 to 2
+
+        const totalSquaresWidth =
+          numCols * squareSize + (numCols - 1) * spacing;
+        const totalSquaresHeight =
+          numRows * squareSize + (numRows - 1) * spacing;
+        const offsetX = (gridSize - totalSquaresWidth) / 2;
+        const offsetY = (gridSize - totalSquaresHeight) / 2;
+
+        // Create the pattern to be repeated in each square
+        const numBoxesInSquare = Math.floor(Math.random() * 3) + 2; // 2 to 4
+        const boxPattern = [];
+
+        for (let b = 0; b < numBoxesInSquare; b++) {
+          const boxX = Math.random() * (squareSize - 2);
+          const boxY = Math.random() * (squareSize - 2);
+          const boxSize = Math.random() * 2 + 1; // size between 1 and 3 px
+
+          let boxColor;
+          do {
+            boxColor = colors[Math.floor(Math.random() * colors.length)];
+          } while (boxColor === backgroundColor);
+
+          boxPattern.push({
+            x: boxX,
+            y: boxY,
+            size: boxSize,
+            color: boxColor,
+          });
+        }
+
+        // Create squares in output grid
+        for (let row = 0; row < numRows; row++) {
+          for (let col = 0; col < numCols; col++) {
+            const square = document.createElement("div");
+            square.style.position = "absolute";
+            square.style.width = `${squareSize}px`;
+            square.style.height = `${squareSize}px`;
+            square.style.left = `${offsetX + col * (squareSize + spacing)}px`;
+            square.style.top = `${offsetY + row * (squareSize + spacing)}px`;
+            square.style.backgroundColor = backgroundColor;
+            square.style.overflow = "hidden";
+
+            // Add the boxes to the square as per pattern
+            for (let b = 0; b < boxPattern.length; b++) {
+              const patternBox = boxPattern[b];
+              const box = document.createElement("div");
+              box.style.position = "absolute";
+              box.style.width = `${patternBox.size}px`;
+              box.style.height = `${patternBox.size}px`;
+              box.style.left = `${patternBox.x}px`;
+              box.style.top = `${patternBox.y}px`;
+              box.style.backgroundColor = patternBox.color;
+              square.appendChild(box);
+            }
+
+            outputGrid.appendChild(square);
+          }
+        }
+
+        // Copy output grid to input grid
+        inputGrid.innerHTML = outputGrid.innerHTML;
+
+        // Add noise to input grid
+        const numDots = Math.floor(Math.random() * 11) + 10; // 10 to 20
+
+        for (let n = 0; n < numDots; n++) {
+          const dotSize = 1; // small dot
+          const dotX = Math.random() * (gridSize - dotSize);
+          const dotY = Math.random() * (gridSize - dotSize);
+
+          let dotColor;
+          do {
+            dotColor = colors[Math.floor(Math.random() * colors.length)];
+          } while (dotColor === backgroundColor || dotColor === "#111111"); // exclude background color and black
+
+          const dot = document.createElement("div");
+          dot.style.position = "absolute";
+          dot.style.width = `${dotSize}px`;
+          dot.style.height = `${dotSize}px`;
+          dot.style.left = `${dotX}px`;
+          dot.style.top = `${dotY}px`;
+          dot.style.backgroundColor = dotColor;
+
+          inputGrid.appendChild(dot);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARC Puzzle</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        background-color: #c2c0c0;
+        margin: none;
+        width: 30px;
+        height: 30px;
+      }
+      .grid {
+        position: relative;
+        background-color: black;
+      }
+      .grid div {
+        position: absolute;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main-content"></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Pick a random number of pairs between 2-5
+      const numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5 inclusive
+
+      // Pick a border color for all pairs (excluding black)
+      const borderColorIndex =
+        Math.floor(Math.random() * (colors.length - 1)) + 1; // 1 to colors.length -1
+      const borderColor = colors[borderColorIndex];
+
+      // Define available colors excluding black and border color
+      const availableColors = colors.filter(
+        (color, index) => index !== 0 && index !== borderColorIndex
+      );
+
+      // Define possible square sizes
+      const possibleSquareSizes = [5, 7, 9, 11, 13, 15];
+
+      // Define mapping between square sizes and colors
+      // Randomly assign colors to sizes
+      const squareSizeToColor = {};
+      const shuffledSizes = possibleSquareSizes
+        .slice()
+        .sort(() => Math.random() - 0.5);
+      const shuffledColors = availableColors
+        .slice()
+        .sort(() => Math.random() - 0.5);
+      for (
+        let i = 0;
+        i < shuffledSizes.length && i < shuffledColors.length;
+        i++
+      ) {
+        squareSizeToColor[shuffledSizes[i]] = shuffledColors[i];
+      }
+
+      // Get main content div
+      const mainContent = document.getElementById("main-content");
+
+      // For each pair
+      for (let pairIndex = 0; pairIndex < numPairs; pairIndex++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.classList.add("pair");
+
+        // Generate random grid size for input and output grids (up to 30x30 px)
+        const gridWidth = Math.floor(Math.random() * 21) + 10; // 10 to 30 px
+        const gridHeight = Math.floor(Math.random() * 21) + 10; // 10 to 30 px
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.classList.add("container");
+
+        // Create input grid
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+        inputGrid.style.width = gridWidth + "px";
+        inputGrid.style.height = gridHeight + "px";
+
+        // Append input grid to input container
+        inputContainer.appendChild(inputGrid);
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.classList.add("container");
+
+        // Create output grid
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+        outputGrid.style.width = gridWidth + "px";
+        outputGrid.style.height = gridHeight + "px";
+
+        // Append output grid to output container
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main content
+        mainContent.appendChild(pairDiv);
+
+        // For each pair, add 1-5 squares to the input grid
+        const numSquares = Math.floor(Math.random() * 5) + 1; // 1 to 5 inclusive
+
+        // Determine possible square sizes for this grid
+        const possibleSquareSizesForThisGrid = possibleSquareSizes.filter(
+          (size) => size <= gridWidth && size <= gridHeight
+        );
+
+        if (possibleSquareSizesForThisGrid.length === 0) {
+          // Cannot place any squares in this grid, continue to next pair
+          continue;
+        }
+
+        // Keep track of occupied areas to prevent overlapping
+        const occupiedAreas = [];
+
+        for (let i = 0; i < numSquares; i++) {
+          // Pick a random square size from possible sizes that fit in the grid
+          const squareSize =
+            possibleSquareSizesForThisGrid[
+              Math.floor(Math.random() * possibleSquareSizesForThisGrid.length)
+            ];
+          const halfSquareSize = (squareSize - 1) / 2;
+
+          // Try to place the square in the grid
+          let positionFound = false;
+          let maxAttempts = 100;
+          while (!positionFound && maxAttempts > 0) {
+            maxAttempts--;
+
+            // Generate random position within the grid
+            const x = Math.floor(Math.random() * (gridWidth - squareSize + 1));
+            const y = Math.floor(Math.random() * (gridHeight - squareSize + 1));
+
+            // Check if this position overlaps with existing squares
+            const newSquare = { x: x, y: y, size: squareSize };
+
+            let overlap = occupiedAreas.some((area) => {
+              return !(
+                (
+                  newSquare.x + newSquare.size <= area.x || // New square is left of existing
+                  newSquare.x >= area.x + area.size || // New square is right of existing
+                  newSquare.y + newSquare.size <= area.y || // New square is above existing
+                  newSquare.y >= area.y + area.size
+                ) // New square is below existing
+              );
+            });
+
+            if (!overlap) {
+              // No overlap, position found
+              occupiedAreas.push(newSquare);
+              positionFound = true;
+
+              // Create the square for input grid
+              const inputSquare = document.createElement("div");
+              inputSquare.style.left = x + "px";
+              inputSquare.style.top = y + "px";
+              inputSquare.style.width = squareSize + "px";
+              inputSquare.style.height = squareSize + "px";
+              inputSquare.style.border = "1px solid " + borderColor;
+              inputSquare.style.boxSizing = "border-box";
+              inputSquare.style.backgroundColor = "transparent";
+
+              // Create the dot in the center
+              const dot = document.createElement("div");
+              dot.style.left = (squareSize - 1) / 2 + "px";
+              dot.style.top = (squareSize - 1) / 2 + "px";
+              dot.style.width = "1px";
+              dot.style.height = "1px";
+              dot.style.backgroundColor = borderColor;
+              inputSquare.appendChild(dot);
+
+              // Append the square to input grid
+              inputGrid.appendChild(inputSquare);
+
+              // Create the square for output grid
+              const outputSquare = inputSquare.cloneNode(true);
+              const squareColor = squareSizeToColor[squareSize];
+
+              // Set background color based on size
+              outputSquare.style.backgroundColor = squareColor;
+
+              // Append the square to output grid
+              outputGrid.appendChild(outputSquare);
+            }
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

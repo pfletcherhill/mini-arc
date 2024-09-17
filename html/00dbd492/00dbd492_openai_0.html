@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00dbd492</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+      }
+      .square {
+        position: absolute;
+        border: 1px solid #FF00FF; /* Example border color */
+        background-color: transparent;
+      }
+      .dot {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        background-color: #FF00FF; /* Example dot color */
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      // Configuration
+      const pairCount = Math.floor(Math.random() * 4) + 2;
+      const borderColor = "#FF00FF"; // Example border color
+      const colors = {
+        5: "#1E93FF",
+        7: "#F93C31",
+        9: "#4FCC30",
+        11: "#FFDC00",
+        13: "#E6E6E6",
+        15: "#E53AA3",
+        17: "#FF851B",
+        19: "#87D8F1",
+        21: "#921231",
+      };
+
+      function getRandomSize() {
+        const sizes = [5, 7, 9, 11, 13, 15, 17, 19, 21];
+        return sizes[Math.floor(Math.random() * sizes.length)];
+      }
+
+      function getRandomPairs(count) {
+        const main = document.querySelector("main");
+        
+        for (let i = 1; i <= count; i++) {
+          const pair = document.createElement("div");
+          pair.classList.add("pair");
+
+          const inputContainer = document.createElement("div");
+          inputContainer.classList.add("container");
+
+          const outputContainer = document.createElement("div");
+          outputContainer.classList.add("container");
+
+          const inputGrid = document.createElement("div");
+          inputGrid.classList.add("grid");
+          const outputGrid = document.createElement("div");
+          outputGrid.classList.add("grid");
+
+          const gridSize = `${Math.floor(Math.random() * 21) + 10}px`;
+          inputGrid.style.width = gridSize;
+          inputGrid.style.height = gridSize;
+          outputGrid.style.width = gridSize;
+          outputGrid.style.height = gridSize;
+
+          const inputSquares = Math.floor(Math.random() * 5) + 1;
+          for (let j = 0; j < inputSquares; j++) {
+            const size = getRandomSize();
+            const square = document.createElement("div");
+            square.classList.add("square");
+            square.style.width = `${size - 2}px`; // minus 2 for border
+            square.style.height = `${size - 2}px`;
+            
+            let posX, posY;
+            do {
+              posX = Math.floor(Math.random() * (parseInt(gridSize) - size + 1));
+              posY = Math.floor(Math.random() * (parseInt(gridSize) - size + 1));
+            } while (isOverlapping(inputGrid, posX, posY, size));
+
+            square.style.left = `${posX}px`;
+            square.style.top = `${posY}px`;
+            
+            const dot = document.createElement("div");
+            dot.classList.add("dot");
+            dot.style.left = `${(size - 1) / 2}px`;
+            dot.style.top = `${(size - 1) / 2}px`;
+
+            square.appendChild(dot);
+            inputGrid.appendChild(square);
+
+            const outputSquare = square.cloneNode(true);
+            outputSquare.style.backgroundColor = colors[size];
+            outputGrid.appendChild(outputSquare);
+          }
+
+          inputContainer.appendChild(inputGrid);
+          outputContainer.appendChild(outputGrid);
+          pair.appendChild(inputContainer);
+          pair.appendChild(outputContainer);
+          main.appendChild(pair);
+        }
+      }
+
+      function isOverlapping(grid, x, y, size) {
+        const squares = grid.querySelectorAll(".square");
+        for (const square of squares) {
+          const rect = square.getBoundingClientRect();
+          const rect2 = {x: x + grid.offsetLeft, y: y + grid.offsetTop, width: size, height: size};
+          if (
+            rect.x < rect2.x + rect2.width &&
+            rect.x + rect.width > rect2.x &&
+            rect.y < rect2.y + rect2.height &&
+            rect.y + rect.height > rect2.y
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      getRandomPairs(pairCount);
+    </script>
+  </body>
+</html>

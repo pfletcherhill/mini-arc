@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0a2355a6</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Function to generate a random integer between min and max (inclusive)
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      // Function to shuffle an array
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      // Pick a border color (any color except black)
+      const borderColor = colors[getRandomInt(1, colors.length - 1)];
+
+      // Create a mapping between numbers 1-6 and random colors
+      const remainingColors = colors.filter(
+        (color) => color !== borderColor && color !== "#111111"
+      );
+      shuffleArray(remainingColors);
+      const colorMapping = {};
+      for (let i = 1; i <= 6; i++) {
+        colorMapping[i] = remainingColors[i - 1];
+      }
+
+      // Function to create a shape
+      function createShape(gridSize) {
+        const numRectangles = getRandomInt(1, 6);
+        const shape = [];
+        const occupiedCells = new Set();
+
+        for (let i = 0; i < numRectangles; i++) {
+          let rect;
+          do {
+            const width = getRandomInt(3, 6);
+            const height = getRandomInt(3, 6);
+            const x = getRandomInt(0, gridSize - width);
+            const y = getRandomInt(0, gridSize - height);
+            rect = { x, y, width, height };
+          } while (!isValidPosition(rect, shape, occupiedCells, gridSize));
+
+          shape.push(rect);
+          for (let dx = 0; dx < rect.width; dx++) {
+            for (let dy = 0; dy < rect.height; dy++) {
+              occupiedCells.add(`${rect.x + dx},${rect.y + dy}`);
+            }
+          }
+        }
+
+        return shape;
+      }
+
+      // Function to check if a rectangle position is valid
+      function isValidPosition(
+        newRect,
+        existingShapes,
+        occupiedCells,
+        gridSize
+      ) {
+        // Check if the rectangle is within the grid
+        if (
+          newRect.x < 0 ||
+          newRect.y < 0 ||
+          newRect.x + newRect.width > gridSize ||
+          newRect.y + newRect.height > gridSize
+        ) {
+          return false;
+        }
+
+        // Check for overlap with existing rectangles
+        for (let dx = -1; dx <= newRect.width; dx++) {
+          for (let dy = -1; dy <= newRect.height; dy++) {
+            if (
+              dx === -1 ||
+              dy === -1 ||
+              dx === newRect.width ||
+              dy === newRect.height
+            ) {
+              if (occupiedCells.has(`${newRect.x + dx},${newRect.y + dy}`)) {
+                return false;
+              }
+            }
+          }
+        }
+
+        // Check for touching with at least one existing rectangle if it's not the first rectangle
+        if (existingShapes.length > 0) {
+          let isTouching = false;
+          for (const rect of existingShapes) {
+            if (
+              (Math.abs(newRect.x - (rect.x + rect.width)) === 1 &&
+                newRect.y < rect.y + rect.height &&
+                rect.y < newRect.y + newRect.height) ||
+              (Math.abs(newRect.y - (rect.y + rect.height)) === 1 &&
+                newRect.x < rect.x + rect.width &&
+                rect.x < newRect.x + newRect.width)
+            ) {
+              isTouching = true;
+              break;
+            }
+          }
+          if (!isTouching) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      // Function to create a pair of grids
+      function createPair() {
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        const gridSize = getRandomInt(10, 30);
+        const shapes = [];
+        const numShapes = getRandomInt(1, 5);
+
+        for (let i = 0; i < numShapes; i++) {
+          shapes.push(createShape(gridSize));
+        }
+
+        // Create input grid
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        const inputGrid = document.createElement("div");
+        inputGrid.className = "grid";
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        inputContainer.appendChild(inputGrid);
+
+        // Create output grid
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        const outputGrid = document.createElement("div");
+        outputGrid.className = "grid";
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+        outputContainer.appendChild(outputGrid);
+
+        // Draw shapes on both grids
+        shapes.forEach((shape) => {
+          const inputShape = document.createElement("div");
+          const outputShape = document.createElement("div");
+          inputShape.style.position = "absolute";
+          outputShape.style.position = "absolute";
+
+          shape.forEach((rect) => {
+            const inputRect = document.createElement("div");
+            const outputRect = document.createElement("div");
+            const style = `
+              position: absolute;
+              left: ${rect.x}px;
+              top: ${rect.y}px;
+              width: ${rect.width}px;
+              height: ${rect.height}px;
+              border: 1px solid ${borderColor};
+              box-sizing: border-box;
+            `;
+            inputRect.style.cssText = style;
+            outputRect.style.cssText = style;
+            outputRect.style.borderColor = colorMapping[shape.length];
+
+            inputShape.appendChild(inputRect);
+            outputShape.appendChild(outputRect);
+          });
+
+          inputGrid.appendChild(inputShape);
+          outputGrid.appendChild(outputShape);
+        });
+
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        return pairDiv;
+      }
+
+      // Create random number of pairs (2-5)
+      const numPairs = getRandomInt(2, 5);
+      const puzzleContainer = document.getElementById("puzzle-container");
+      for (let i = 0; i < numPairs; i++) {
+        puzzleContainer.appendChild(createPair());
+      }
+    </script>
+  </body>
+</html>

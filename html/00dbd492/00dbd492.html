@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00dbd492</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+      }
+      .square {
+        position: absolute;
+        border: 1px solid #FF851B; /* Border color */
+        box-sizing: border-box;
+      }
+      .dot {
+        width: 1px;
+        height: 1px;
+        background-color: #FF851B; /* Dot color and Border color */
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange (border color - to be excluded)
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const borderColor = "#FF851B";
+      const availableColors = colors.filter(color => color !== borderColor && color !== "#111111");
+      const sizeToColorMap = {};
+      [5, 7, 9, 11, 13, 15, 17, 19].forEach(size => sizeToColorMap[size] = availableColors[Math.floor(Math.random() * availableColors.length)]);
+
+      const main = document.querySelector('main');
+      const numberOfPairs = Math.floor(Math.random() * 4) + 2;
+
+      for (let i = 1; i <= numberOfPairs; i++) {
+        const pair = document.createElement('div');
+        pair.className = 'pair';
+        
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'container';
+        const outputContainer = document.createElement('div');
+        outputContainer.className = 'container';
+
+        const gridWidth = Math.floor(Math.random() * 21) + 10;
+        const gridHeight = Math.floor(Math.random() * 21) + 10;
+        
+        const inputGrid = document.createElement('div');
+        inputGrid.id = 'input-' + i;
+        inputGrid.className = 'grid';
+        inputGrid.style.width = gridWidth + 'px';
+        inputGrid.style.height = gridHeight + 'px';
+        
+        const outputGrid = document.createElement('div');
+        outputGrid.id = 'output-' + i;
+        outputGrid.className = 'grid';
+        outputGrid.style.width = gridWidth + 'px';
+        outputGrid.style.height = gridHeight + 'px';
+        
+        const squaresCount = Math.floor(Math.random() * 5) + 1;
+        const occupiedPositions = [];
+        
+        for (let j = 0; j < squaresCount; j++) {
+          let squareSize = Object.keys(sizeToColorMap)[Math.floor(Math.random() * Object.keys(sizeToColorMap).length)];
+          squareSize = parseInt(squareSize);
+          let posX, posY;
+          
+          let attempt = 0;
+          const maxAttempts = 100;
+          do {
+            posX = Math.floor(Math.random() * (gridWidth - squareSize - 2));
+            posY = Math.floor(Math.random() * (gridHeight - squareSize - 2));
+            attempt++;
+          } while (occupiedPositions.some(pos => Math.abs(posX - pos.x) < pos.size + 1 && Math.abs(posY - pos.y) < pos.size + 1) && attempt < maxAttempts);
+          
+          if (attempt >= maxAttempts) continue;
+          
+          occupiedPositions.push({ x: posX, y: posY, size: squareSize });
+
+          const squareInput = createSquare(posX, posY, squareSize, borderColor, squareSize, false);
+          inputGrid.appendChild(squareInput);
+
+          const squareOutput = createSquare(posX, posY, squareSize, borderColor, squareSize, true, sizeToColorMap);
+          outputGrid.appendChild(squareOutput);
+        }
+
+        inputContainer.appendChild(inputGrid);
+        outputContainer.appendChild(outputGrid);
+        
+        pair.appendChild(inputContainer);
+        pair.appendChild(outputContainer);
+        main.appendChild(pair);
+      }
+
+      function createSquare(x, y, size, borderColor, dotSize, isOutput, colorMap = {}) {
+        const square = document.createElement('div');
+        square.className = 'square';
+        square.style.width = `${size - 2}px`; 
+        square.style.height = `${size - 2}px`;
+        square.style.left = `${x}px`;
+        square.style.top = `${y}px`;
+        square.style.borderColor = borderColor;
+        if (isOutput) {
+          square.style.backgroundColor = colorMap[size];
+        }
+
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        dot.style.backgroundColor = borderColor;
+        square.appendChild(dot);
+        return square;
+      }
+    </script>
+  </body>
+</html>

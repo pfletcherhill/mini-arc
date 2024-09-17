@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>03560426</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="pair">
+        <div class="container">
+          <div id="input-1" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-1" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-2" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-2" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-3" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-3" class="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      for (let i = 4; i <= numPairs; i++) {
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        const inputDiv = document.createElement("div");
+        inputDiv.className = "container";
+        const inputGrid = document.createElement("div");
+        inputGrid.id = `input-${i}`;
+        inputGrid.className = "grid";
+        inputDiv.appendChild(inputGrid);
+
+        const outputDiv = document.createElement("div");
+        outputDiv.className = "container";
+        const outputGrid = document.createElement("div");
+        outputGrid.id = `output-${i}`;
+        outputGrid.className = "grid";
+        outputDiv.appendChild(outputGrid);
+
+        pairDiv.appendChild(inputDiv);
+        pairDiv.appendChild(outputDiv);
+
+        document.querySelector("main").appendChild(pairDiv);
+      }
+
+      for (let i = 1; i <= numPairs; i++) {
+        const gridSize = Math.floor(Math.random() * 21) + 10;
+        const inputGrid = document.getElementById(`input-${i}`);
+        const outputGrid = document.getElementById(`output-${i}`);
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        const numShapes = Math.floor((gridSize - 1) / 4);
+        for (let j = 0; j < numShapes; j++) {
+          const shapeHeight = Math.floor(Math.random() * 4) + 2;
+          const shapeWidth = Math.floor(Math.random() * 3) + 1;
+          const shapeColor = colors[Math.floor(Math.random() * colors.length)];
+          const shapeDiv = document.createElement("div");
+          shapeDiv.style.position = "absolute";
+          shapeDiv.style.bottom = "0";
+          shapeDiv.style.left = `${j * (shapeWidth + 1)}px`;
+          shapeDiv.style.width = `${shapeWidth}px`;
+          shapeDiv.style.height = `${shapeHeight}px`;
+          shapeDiv.style.backgroundColor = shapeColor;
+          inputGrid.appendChild(shapeDiv);
+
+          const outputShapeDiv = shapeDiv.cloneNode();
+          outputShapeDiv.style.left = `${j * (shapeWidth - 1)}px`;
+          outputShapeDiv.style.top = `${j * (shapeHeight - 1)}px`;
+          outputShapeDiv.style.bottom = "auto";
+          outputGrid.appendChild(outputShapeDiv);
+        }
+      }
+    </script>
+  </body>
+</html>

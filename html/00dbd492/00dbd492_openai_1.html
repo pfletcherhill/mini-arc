@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00dbd492</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+      }
+      .square {
+        position: absolute;
+        border: 1px solid VAR(--border-color);
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .square::after {
+        content: '';
+        width: 1px;
+        height: 1px;
+        background-color: VAR(--border-color);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be inserted here by JS -->
+    </main>
+
+    <script>
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function createRandomSize() {
+        const sizes = [5, 7, 9, 11, 13, 15];
+        return sizes[getRandomInt(0, sizes.length - 1)];
+      }
+
+      const numOfPairs = getRandomInt(2, 5);
+      const borderColor = "#87D8F1"; // Randomly selected border color
+      const colors = {
+        5: "#1E93FF", // blue
+        7: "#F93C31", // red
+        9: "#4FCC30", // green
+        11: "#FFDC00", // yellow
+        13: "#E6E6E6", // grey
+        15: "#E53AA3", // magenta
+      };
+
+      const mainElement = document.querySelector("main");
+
+      for (let i = 1; i <= numOfPairs; i++) {
+        const inputSize = getRandomInt(10, 30);
+        const outputSize = inputSize;
+
+        const pair = document.createElement("div");
+        pair.className = "pair";
+
+        const container1 = document.createElement("div");
+        container1.className = "container";
+        const grid1 = document.createElement("div");
+        grid1.className = "grid";
+        grid1.id = `input-${i}`;
+        grid1.style.width = `${inputSize}px`;
+        grid1.style.height = `${inputSize}px`;
+
+        const container2 = document.createElement("div");
+        container2.className = "container";
+        const grid2 = document.createElement("div");
+        grid2.className = "grid";
+        grid2.id = `output-${i}`;
+        grid2.style.width = `${outputSize}px`;
+        grid2.style.height = `${outputSize}px`;
+
+        const numSquares = getRandomInt(1, 5);
+        const occupiedSpaces = [];
+
+        for (let j = 0; j < numSquares; j++) {
+          const squareSize = createRandomSize();
+          const halfSize = Math.floor(squareSize / 2);
+
+          let x, y, overlap;
+          do {
+            overlap = false;
+            x = getRandomInt(0, inputSize - squareSize);
+            y = getRandomInt(0, inputSize - squareSize);
+            occupiedSpaces.forEach(space => {
+              if (
+                x < space.x + space.size &&
+                x + squareSize > space.x &&
+                y < space.y + space.size &&
+                y + squareSize > space.y
+              ) {
+                overlap = true;
+              }
+            });
+          } while (overlap);
+
+          occupiedSpaces.push({ x, y, size: squareSize });
+
+          const square1 = document.createElement("div");
+          square1.className = "square";
+          square1.style.width = `${squareSize}px`;
+          square1.style.height = `${squareSize}px`;
+          square1.style.left = `${x}px`;
+          square1.style.top = `${y}px`;
+          square1.style.borderColor = borderColor;
+
+          const square2 = square1.cloneNode(false);
+          square2.style.backgroundColor = colors[squareSize];
+
+          grid1.appendChild(square1);
+          grid2.appendChild(square2);
+        }
+
+        container1.appendChild(grid1);
+        container2.appendChild(grid2);
+        pair.appendChild(container1);
+        pair.appendChild(container2);
+        mainElement.appendChild(pair);
+      }
+    </script>
+  </body>
+</html>

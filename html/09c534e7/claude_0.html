@@ -1,0 +1,175 @@
+Here is the updated HTML document for the puzzle 09c534e7:
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>09c534e7</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- The pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const main = document.querySelector("main");
+      const numPairs = Math.floor(Math.random() * 4) + 2; // Random number of pairs between 2-5
+
+      const backgroundColor = "#111111"; // Black background color
+      const drawingColor = "#FFFFFF"; // White drawing color
+
+      for (let i = 0; i < numPairs; i++) {
+        const pair = document.createElement("div");
+        pair.classList.add("pair");
+
+        const inputContainer = document.createElement("div");
+        inputContainer.classList.add("container");
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+        inputGrid.id = `input-${i + 1}`;
+        inputContainer.appendChild(inputGrid);
+        pair.appendChild(inputContainer);
+
+        const outputContainer = document.createElement("div");
+        outputContainer.classList.add("container");
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+        outputGrid.id = `output-${i + 1}`;
+        outputContainer.appendChild(outputGrid);
+        pair.appendChild(outputContainer);
+
+        main.appendChild(pair);
+
+        const gridSize = Math.floor(Math.random() * 16) + 15; // Random grid size between 15x15 and 30x30
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        const numGroups = Math.floor(Math.random() * 3) + 2; // Random number of groups between 2-4
+        const groupColors = [];
+
+        for (let j = 0; j < numGroups; j++) {
+          const groupColor = colors[Math.floor(Math.random() * (colors.length - 1)) + 1]; // Random color except background color
+          groupColors.push(groupColor);
+
+          const numRectangles = Math.floor(Math.random() * 3) + 2; // Random number of rectangles between 2-4
+          let prevRect = null;
+
+          for (let k = 0; k < numRectangles; k++) {
+            const rectSize = Math.floor(Math.random() * 6) + 3; // Random rectangle size between 3x3 and 8x8
+            const rect = document.createElement("div");
+            rect.style.position = "absolute";
+            rect.style.width = `${rectSize}px`;
+            rect.style.height = `${rectSize}px`;
+            rect.style.backgroundColor = drawingColor;
+            rect.style.border = `1px solid ${drawingColor}`;
+
+            let rectX, rectY;
+            do {
+              rectX = Math.floor(Math.random() * (gridSize - rectSize));
+              rectY = Math.floor(Math.random() * (gridSize - rectSize));
+            } while (
+              prevRect &&
+              (Math.abs(rectX - prevRect.offsetLeft) < rectSize + 1 ||
+                Math.abs(rectY - prevRect.offsetTop) < rectSize + 1)
+            );
+
+            rect.style.left = `${rectX}px`;
+            rect.style.top = `${rectY}px`;
+
+            if (prevRect) {
+              const line = document.createElement("div");
+              line.style.position = "absolute";
+              line.style.backgroundColor = drawingColor;
+
+              if (Math.random() < 0.5) {
+                // Horizontal line
+                line.style.width = `${Math.abs(rectX - prevRect.offsetLeft) + 1}px`;
+                line.style.height = "1px";
+                line.style.left = `${Math.min(rectX, prevRect.offsetLeft)}px`;
+                line.style.top = `${prevRect.offsetTop + Math.floor(prevRect.offsetHeight / 2)}px`;
+              } else {
+                // Vertical line
+                line.style.width = "1px";
+                line.style.height = `${Math.abs(rectY - prevRect.offsetTop) + 1}px`;
+                line.style.left = `${prevRect.offsetLeft + Math.floor(prevRect.offsetWidth / 2)}px`;
+                line.style.top = `${Math.min(rectY, prevRect.offsetTop)}px`;
+              }
+
+              inputGrid.appendChild(line);
+              outputGrid.appendChild(line.cloneNode());
+            }
+
+            inputGrid.appendChild(rect);
+            outputGrid.appendChild(rect.cloneNode());
+
+            prevRect = rect;
+          }
+
+          // Add 1px square to a random rectangle in the group
+          const randomRect = inputGrid.children[Math.floor(Math.random() * inputGrid.children.length)];
+          const square = document.createElement("div");
+          square.style.position = "absolute";
+          square.style.width = "1px";
+          square.style.height = "1px";
+          square.style.backgroundColor = groupColor;
+          square.style.left = `${Math.floor(Math.random() * (randomRect.offsetWidth - 2)) + 1}px`;
+          square.style.top = `${Math.floor(Math.random() * (randomRect.offsetHeight - 2)) + 1}px`;
+          randomRect.appendChild(square);
+        }
+
+        // Fill rectangles in output grid with corresponding group colors
+        for (let j = 0; j < outputGrid.children.length; j++) {
+          const rect = outputGrid.children[j];
+          if (rect.tagName === "DIV" && rect.children.length === 0) {
+            const groupIndex = Math.floor(j / (outputGrid.children.length / numGroups));
+            rect.style.backgroundColor = groupColors[groupIndex];
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00576224</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+      
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function createGrid(rows, cols) {
+        const grid = [];
+        const colorChoices = colors.slice(1); 
+        for (let i = 0; i < rows; i++) {
+          const row = [];
+          for (let j = 0; j < cols; j++) {
+            row.push(colorChoices[getRandomInt(0, colorChoices.length - 1)]);
+          }
+          grid.push(row);
+        }
+        return grid;
+      }
+
+      function createTiledGrid(grid, tileX, tileY) {
+        const rows = grid.length;
+        const cols = grid[0].length;
+        const tiledGrid = [];
+        for (let i = 0; i < rows * tileY; i++) {
+          const row = [];
+          for (let j = 0; j < cols * tileX; j++) {
+            row.push(grid[i % rows][j % cols]);
+          }
+          tiledGrid.push(row);
+        }
+        return tiledGrid;
+      }
+
+      function drawGrid(grid, element) {
+        element.style.display = 'grid';
+        element.style.gridTemplateColumns = `repeat(${grid[0].length}, 1fr)`;
+        element.style.gridTemplateRows = `repeat(${grid.length}, 1fr)`;
+        grid.forEach(row => {
+          row.forEach(color => {
+            const div = document.createElement('div');
+            div.style.backgroundColor = color;
+            element.appendChild(div);
+          });
+        });
+      }
+
+      const main = document.querySelector('main');
+      const numPairs = getRandomInt(2, 5);
+      const tileX = getRandomInt(2, 3);
+      const tileY = getRandomInt(2, 3);
+
+      for (let i = 1; i <= numPairs; i++) {
+        const pair = document.createElement('div');
+        pair.className = 'pair';
+
+        const container1 = document.createElement('div');
+        container1.className = 'container';
+        const inputGrid = document.createElement('div');
+        inputGrid.id = `input-${i}`;
+        inputGrid.className = 'grid';
+        const inputRows = getRandomInt(2, 5);
+        const inputCols = getRandomInt(2, 5);
+        const inputPattern = createGrid(inputRows, inputCols);
+        drawGrid(inputPattern, inputGrid);
+        container1.appendChild(inputGrid);
+
+        const container2 = document.createElement('div');
+        container2.className = 'container';
+        const outputGrid = document.createElement('div');
+        outputGrid.id = `output-${i}`;
+        outputGrid.className = 'grid';
+        const outputPattern = createTiledGrid(inputPattern, tileX, tileY);
+        drawGrid(outputPattern, outputGrid);
+        container2.appendChild(outputGrid);
+
+        pair.appendChild(container1);
+        pair.appendChild(container2);
+        main.appendChild(pair);
+      }
+    </script>
+  </body>
+</html>

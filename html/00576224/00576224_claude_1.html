@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>00576224</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="pair">
+        <div class="container">
+          <div id="input-1" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-1" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-2" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-2" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-3" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-3" class="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      const tileRatioX = Math.floor(Math.random() * 2) + 2;
+      const tileRatioY = Math.floor(Math.random() * 2) + 2;
+
+      for (let i = 1; i <= numPairs; i++) {
+        const inputGrid = document.getElementById(`input-${i}`);
+        const outputGrid = document.getElementById(`output-${i}`);
+
+        const inputWidth = Math.floor(Math.random() * 4) + 2;
+        const inputHeight = Math.floor(Math.random() * 4) + 2;
+        const outputWidth = inputWidth * tileRatioX;
+        const outputHeight = inputHeight * tileRatioY;
+
+        inputGrid.style.width = `${inputWidth}px`;
+        inputGrid.style.height = `${inputHeight}px`;
+        outputGrid.style.width = `${outputWidth}px`;
+        outputGrid.style.height = `${outputHeight}px`;
+
+        const numColors = Math.floor(Math.random() * 2) + 2;
+        const selectedColors = colors.slice(1, numColors + 1);
+
+        for (let y = 0; y < inputHeight; y++) {
+          for (let x = 0; x < inputWidth; x++) {
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            pixel.style.backgroundColor =
+              selectedColors[Math.floor(Math.random() * numColors)];
+            pixel.style.left = `${x}px`;
+            pixel.style.top = `${y}px`;
+            inputGrid.appendChild(pixel);
+          }
+        }
+
+        for (let y = 0; y < outputHeight; y++) {
+          for (let x = 0; x < outputWidth; x++) {
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            pixel.style.backgroundColor =
+              selectedColors[
+                Math.floor(Math.random() * numColors)
+              ];
+            pixel.style.left = `${x}px`;
+            pixel.style.top = `${y}px`;
+            outputGrid.appendChild(pixel);
+          }
+        }
+      }
+
+      if (numPairs < 5) {
+        for (let i = numPairs + 1; i <= 5; i++) {
+          const pair = document.querySelector(`.pair:nth-child(${i})`);
+          pair.style.display = "none";
+        }
+      }
+    </script>
+  </body>
+</html>

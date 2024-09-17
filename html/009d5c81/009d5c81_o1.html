@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>009d5c81</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be generated dynamically -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      window.onload = function () {
+        // Get the main element
+        const main = document.querySelector("main");
+
+        // Generate a random number of pairs between 2 and 5
+        const numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+        // Remove existing pairs if any
+        main.innerHTML = "";
+
+        // For each pair
+        for (let i = 1; i <= numPairs; i++) {
+          // Create the pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create input container
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+
+          // Create output container
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+
+          // Create input grid
+          const inputGrid = document.createElement("div");
+          inputGrid.id = "input-" + i;
+          inputGrid.className = "grid";
+
+          // Create output grid
+          const outputGrid = document.createElement("div");
+          outputGrid.id = "output-" + i;
+          outputGrid.className = "grid";
+
+          // Append grids to containers
+          inputContainer.appendChild(inputGrid);
+          outputContainer.appendChild(outputGrid);
+
+          // Append containers to pairDiv
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pairDiv to main
+          main.appendChild(pairDiv);
+
+          // Now, generate the grids
+          generateGrids(inputGrid, outputGrid);
+        }
+
+        function generateGrids(inputGrid, outputGrid) {
+          // Generate gridWidth and gridHeight between 12 and 30
+          const gridWidth = Math.floor(Math.random() * (30 - 12 + 1)) + 12;
+          const gridHeight = Math.floor(Math.random() * (30 - 12 + 1)) + 12;
+
+          // Set the size of the grid divs
+          inputGrid.style.width = gridWidth + "px";
+          inputGrid.style.height = gridHeight + "px";
+          outputGrid.style.width = gridWidth + "px";
+          outputGrid.style.height = gridHeight + "px";
+
+          // Create canvases
+          const inputCanvas = document.createElement("canvas");
+          inputCanvas.width = gridWidth;
+          inputCanvas.height = gridHeight;
+          inputCanvas.style.width = gridWidth + "px";
+          inputCanvas.style.height = gridHeight + "px";
+
+          const outputCanvas = document.createElement("canvas");
+          outputCanvas.width = gridWidth;
+          outputCanvas.height = gridHeight;
+          outputCanvas.style.width = gridWidth + "px";
+          outputCanvas.style.height = gridHeight + "px";
+
+          // Append canvases to grids
+          inputGrid.appendChild(inputCanvas);
+          outputGrid.appendChild(outputCanvas);
+
+          const inputCtx = inputCanvas.getContext("2d");
+          const outputCtx = outputCanvas.getContext("2d");
+
+          // Fill background
+          inputCtx.fillStyle = "#111111";
+          inputCtx.fillRect(0, 0, gridWidth, gridHeight);
+
+          outputCtx.fillStyle = "#111111";
+          outputCtx.fillRect(0, 0, gridWidth, gridHeight);
+
+          // From colors (excluding black), pick a color for the 3x3 shape and a color for the 10x10 shape
+          const colorsExcludingBlack = colors.slice(1);
+          const colorChoices = colorsExcludingBlack.slice();
+          const color3x3 = colorChoices.splice(
+            Math.floor(Math.random() * colorChoices.length),
+            1
+          )[0];
+          const color10x10 = colorChoices.splice(
+            Math.floor(Math.random() * colorChoices.length),
+            1
+          )[0];
+
+          // Then pick three more colors
+          const colorOptions = colorChoices.slice();
+          const colorMapping = {};
+          const patterns = [];
+
+          for (let j = 0; j < 3; j++) {
+            const color = colorOptions.splice(
+              Math.floor(Math.random() * colorOptions.length),
+              1
+            )[0];
+            const pattern = generatePattern();
+            colorMapping[JSON.stringify(pattern)] = color;
+            patterns.push(pattern);
+          }
+
+          // For the 3x3 shape, pick one of the patterns
+          const selectedPatternIndex = Math.floor(
+            Math.random() * patterns.length
+          );
+          const selectedPattern = patterns[selectedPatternIndex];
+          const selectedColor = colorMapping[JSON.stringify(selectedPattern)];
+
+          // Generate positions for the shapes
+          const maxX3 = gridWidth - 3;
+          const maxY3 = gridHeight - 3;
+          const x3x3 = Math.floor(Math.random() * (maxX3 + 1));
+          const y3x3 = Math.floor(Math.random() * (maxY3 + 1));
+
+          let x10x10, y10x10;
+          let attempts = 0;
+          const maxAttempts = 100;
+          do {
+            const maxX10 = gridWidth - 10;
+            const maxY10 = gridHeight - 10;
+            x10x10 = Math.floor(Math.random() * (maxX10 + 1));
+            y10x10 = Math.floor(Math.random() * (maxY10 + 1));
+            attempts++;
+          } while (
+            rectanglesOverlap(x3x3, y3x3, 3, 3, x10x10, y10x10, 10, 10) &&
+            attempts < maxAttempts
+          );
+
+          if (attempts >= maxAttempts) {
+            // If failed to find non-overlapping positions, adjust positions
+            x10x10 = (x3x3 + 4) % (gridWidth - 10);
+            y10x10 = (y3x3 + 4) % (gridHeight - 10);
+          }
+
+          // Draw the 3x3 shape in the input grid
+          drawShape(inputCtx, selectedPattern, color3x3, x3x3, y3x3);
+
+          // Draw the 10x10 shape in the input grid
+          const shape10x10 = generateConnectedShape(10, 10);
+          drawShape(inputCtx, shape10x10, color10x10, x10x10, y10x10);
+
+          // For the output grid, copy the 10x10 shape but change its color based on the mapping
+          drawShape(outputCtx, shape10x10, selectedColor, x10x10, y10x10);
+        }
+
+        function rectanglesOverlap(x1, y1, w1, h1, x2, y2, w2, h2) {
+          return !(
+            x1 + w1 <= x2 ||
+            x1 >= x2 + w2 ||
+            y1 + h1 <= y2 ||
+            y1 >= y2 + h2
+          );
+        }
+
+        function generatePattern() {
+          const patterns = [
+            // Cross
+            [
+              [0, 1, 0],
+              [1, 1, 1],
+              [0, 1, 0],
+            ],
+            // Diagonal
+            [
+              [1, 0, 0],
+              [0, 1, 0],
+              [0, 0, 1],
+            ],
+            // Square
+            [
+              [1, 1, 1],
+              [1, 0, 1],
+              [1, 1, 1],
+            ],
+            // T-shape
+            [
+              [1, 1, 1],
+              [0, 1, 0],
+              [0, 1, 0],
+            ],
+            // L-shape
+            [
+              [1, 0, 0],
+              [1, 0, 0],
+              [1, 1, 1],
+            ],
+          ];
+
+          // Pick a random pattern
+          const index = Math.floor(Math.random() * patterns.length);
+          const pattern = patterns.splice(index, 1)[0];
+
+          return pattern;
+        }
+
+        function generateConnectedShape(width, height) {
+          // For simplicity, we'll generate a solid rectangle
+          const shape = [];
+          for (let y = 0; y < height; y++) {
+            const row = [];
+            for (let x = 0; x < width; x++) {
+              row.push(1);
+            }
+            shape.push(row);
+          }
+          return shape;
+        }
+
+        function drawShape(ctx, shape, color, offsetX, offsetY) {
+          ctx.fillStyle = color;
+          for (let y = 0; y < shape.length; y++) {
+            for (let x = 0; x < shape[0].length; x++) {
+              if (shape[y][x]) {
+                ctx.fillRect(offsetX + x, offsetY + y, 1, 1);
+              }
+            }
+          }
+        }
+      };
+    </script>
+  </body>
+</html>

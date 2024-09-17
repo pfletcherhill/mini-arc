@@ -1,0 +1,4 @@
+- Pick a marker color
+- For each input grid, start by generating a pattern using all colors except the marker color in a rectangle that is 8x8px to 15x15px in size, though it does not have to be square. The input grid should then be 2x the width and 2x the height of that rectangle. The original rectangle should go in the top left quadrant of the input grid, then it should be repeated in the other three quadrants. In the top right quadrant, flip the rectangle horizontally. In the bottom left quadrant, flip it vertically. And in the bottom right quadrant, flip it both vertically and horizontally.
+- For each input grid, add a box that is 3x3px to 9x9px in size, though it doesn't have to be square. Add the box anywhere on top of the input grid and make its background the marker color.
+- Each output grid, should be the size of the marker box added on top of the input and be pixel-for-pixel whatever was underneath the marker box in the input.

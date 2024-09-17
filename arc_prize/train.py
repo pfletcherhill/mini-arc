@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -39,6 +40,8 @@ class EpochState:
     epsilon: float
     grad_norm: float
     param_norm: float
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
 
 
 @dataclass
@@ -82,8 +85,8 @@ def train_arc_transformer(
     checkpoint_dict = torch.load(model_filename, weights_only=False)
     checkpoint = ARCModelState(**checkpoint_dict)
 
-    # model = ARCTransformerEncoderDecoder(checkpoint.model_params)
-    model = ARCVisionEncoderDecoder(checkpoint.model_params)
+    model = ARCTransformerEncoderDecoder(checkpoint.model_params)
+    # model = ARCVisionEncoderDecoder(checkpoint.model_params)
     if checkpoint.model_state_dict is not None:
         model.load_state_dict(checkpoint.model_state_dict)
 
@@ -99,9 +102,11 @@ def train_arc_transformer(
         color_offset=1,
     )
 
+    train_params = train_params or checkpoint.train_params
+
     train_loader, val_loader = make_data_loaders(
-        checkpoint.train_params.dataset_dir,
-        checkpoint.train_params.batch_size,
+        train_params.dataset_dir,
+        train_params.batch_size,
         dataset_params,
     )
     # train_loader, val_loader = make_re_arc_data_loaders(
@@ -113,8 +118,7 @@ def train_arc_transformer(
     print(
         f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items"
     )
-
-    train_params = train_params or checkpoint.train_params
+    print(f"Using batch size of {train_params.batch_size}")
 
     class_weights = torch.ones(parallel_model.module.num_classes).to(device)
     if train_params.loss_class_weights is not None:
@@ -146,6 +150,7 @@ def train_arc_transformer(
         parallel_model.train()
         train_loss = 0.0
         train_accuracy = 0.0
+        start_time = time.time()
 
         for batch in train_loader:
             # grids, masks, target_grid = batch
@@ -203,6 +208,8 @@ def train_arc_transformer(
         param_group = optimizer.param_groups[0]
         beta1, beta2 = param_group["betas"]
 
+        end_time = time.time()
+
         checkpoint.epochs.append(
             EpochState(
                 train_loss=train_loss,
@@ -216,6 +223,8 @@ def train_arc_transformer(
                 weight_decay=param_group["weight_decay"],
                 grad_norm=calculate_grad_norm(parallel_model),
                 param_norm=calculate_param_norm(parallel_model),
+                start_time=start_time,
+                end_time=end_time,
             )
         )
 
@@ -223,9 +232,12 @@ def train_arc_transformer(
         #     for layer in batch:
         #         visualize_all_heads(layer)
 
-        print(f"Epoch {epoch+1}/{total_epochs}:")
+        print(f"Epoch {epoch+1}/{total_epochs} for {model_filename}:")
         print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
         print(f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
+
+        duration = end_time - start_time
+        print(f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)")
 
         # Save the best model
         if val_loss < checkpoint.best_val_loss:

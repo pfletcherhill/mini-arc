@@ -20,9 +20,9 @@ data_volume = modal.Volume.from_name("arc-data")
 
 
 @modal_app.function(
-    gpu="A10G:2",
+    gpu="A100:2",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
-    timeout=(60 * 60 * 12),
+    timeout=(60 * 60 * 24),
 )
 def train(
     model_name: str,
@@ -70,8 +70,8 @@ def evaluate_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = ARCModelState(**torch.load(model_filename, map_location=device))
 
-    # model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
-    model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
+    model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
+    # model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
     if checkpoint.model_state_dict is not None:
         model.load_state_dict(checkpoint.model_state_dict)
 

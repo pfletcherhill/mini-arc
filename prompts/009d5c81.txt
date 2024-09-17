@@ -1,0 +1,8 @@
+- Each input grid and output grid should be the same size. For each pair, they both should be between 12x12 px and 30x30 px but don't have to be square.
+- Each input grid should include two shapes: one shape that is 3x3 px and another that is 10x10 px.
+- From the list of colors, except black, pick a color for the 3x3 px shape and another for the 10x10 px shape.
+- Then pick three more colors. In each pair, you will change the color of the 10x10px shape based on the pattern of the 3x3 shape.
+- For each of the three picked colors, define a pattern by drawing a unique pattern inside a 3x3px shape with the given color. An example might be a cross like [[0, 1, 0], [1, 1, 1], [0, 1, 0]]. The 1s in that pattern should be the color and the rest of the shape should be transparent.
+- For each input grid, pick one of the patterns for the 3x3 px shape and add it to the grid. Then make a similar pixel art shape in the 10x10 px shape in the 10x10px color. Make sure that all the pixels in the 10x10 shape are touching, and there's not a gap in the shape. Both shapes should be inside the input grid and not overlapping.
+- For each output grid, copy the 10x10 px shape from the input grid but change the background color to one of the three picked colors based on the 3x3 shape in the input grid. For instance, if the cross was mapped to blue in the mapping defined above, turn the drawn pixels in the 10x10px shape to blue.
+

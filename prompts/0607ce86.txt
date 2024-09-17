@@ -1,0 +1,5 @@
+- For each pair, the input and output grid should be the same size. Each pair the input and output grid should both be between 20x20px and 30x30px.
+- Pick a background color from the colors. In most cases the background color should be black. Make all the grids have the background color.
+- For each output grid, add squares. Each square should have width between 4-6px and height between 4-6px. The squares should be laid out in a grid, with 2-3 rows and 2-3 columns. There should be 1-2px spacing between each row and column.
+- Then for each output grid, in each square, add 2-4 other boxes in any color other than the background color. Add the exact same boxes to every square in the grid, so the pattern is repeated in all the squares.
+- For each of the input grids, copy the output grid exactly, maintaining the colors and positions of all the contnets. Then, add noise to each of the input grids. Randomly add 10-20 dots all over each of the input grids using any color except the background color and black. 

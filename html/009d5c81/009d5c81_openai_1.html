@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>009d5c81</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+    </main>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const main = document.querySelector('main');
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const getRandomColors = (count, excludeColor="#111111") => {
+        const colorsCopy = colors.filter(color => color !== excludeColor);
+        const chosenColors = [];
+        for (let i = 0; i < count; i++) {
+          const index = Math.floor(Math.random() * colorsCopy.length);
+          chosenColors.push(colorsCopy[index]);
+          colorsCopy.splice(index, 1);
+        }
+        return chosenColors;
+      };
+
+      const createShape = (size, color) => {
+        const shape = document.createElement('div');
+        shape.style.position = 'absolute';
+        shape.style.height = `${size}px`;
+        shape.style.width = `${size}px`;
+        shape.style.backgroundColor = color;
+        return shape;
+      };
+
+      const createPatternGrid = (patterns, color) => {
+        const grid = document.createElement('div');
+        grid.style.position = 'absolute';
+        grid.style.height = '3px';
+        grid.style.width = '3px';
+        for(let row = 0; row < 3; row++) {
+          for(let col = 0; col < 3; col++) {
+            if(patterns[row][col] === 1) {
+              const pixel = document.createElement('div');
+              pixel.style.position = 'absolute';
+              pixel.style.height = '1px';
+              pixel.style.width = '1px';
+              pixel.style.backgroundColor = color;
+              pixel.style.top = `${row}px`;
+              pixel.style.left = `${col}px`;
+              grid.appendChild(pixel);
+            }
+          }
+        }
+        return grid;
+      };
+
+      const patterns = [
+        [[0, 1, 0], [1, 1, 1], [0, 1, 0]], // Cross pattern
+        [[1, 1, 1], [1, 0, 1], [1, 1, 1]], // Hollow middle
+        [[0, 0, 0], [1, 1, 1], [0, 0, 0]], // Middle row
+      ];
+
+      const createPair = () => {
+        const container1 = document.createElement('div');
+        container1.className = 'container';
+        const inputGrid = document.createElement('div');
+        inputGrid.className = 'grid';
+
+        const container2 = document.createElement('div');
+        container2.className = 'container';
+        const outputGrid = document.createElement('div');
+        outputGrid.className = 'grid';
+
+        const minDim = 12, maxDim = 30;
+        const inputHeight = Math.floor(Math.random() * (maxDim - minDim + 1)) + minDim;
+        const inputWidth = Math.floor(Math.random() * (maxDim - minDim + 1)) + minDim;
+        inputGrid.style.height = `${inputHeight}px`;
+        inputGrid.style.width = `${inputWidth}px`;
+
+        outputGrid.style.height = `${inputHeight}px`;
+        outputGrid.style.width = `${inputWidth}px`;
+
+        const chosenPattern = patterns[Math.floor(Math.random() * patterns.length)];
+        const [shapeColor, patternColor, ...transformColors] = getRandomColors(5);
+        const shape3x3 = createShape(3, shapeColor);
+        const pattern3x3 = createPatternGrid(chosenPattern, patternColor);
+        const shape10x10 = createShape(10, shapeColor);
+        
+        inputGrid.appendChild(shape3x3);
+        inputGrid.appendChild(shape10x10);
+
+        shape3x3.appendChild(pattern3x3);
+        shape10x10.appendChild(createPatternGrid(chosenPattern, patternColor));
+
+        const transformedShape10x10 = createShape(10, transformColors[0]);
+        transformedShape10x10.appendChild(createPatternGrid(chosenPattern, transformColors[0]));
+
+        outputGrid.appendChild(transformedShape10x10);
+
+        container1.appendChild(inputGrid);
+        container2.appendChild(outputGrid);
+
+        const pair = document.createElement('div');
+        pair.className = 'pair';
+        pair.appendChild(container1);
+        pair.appendChild(container2);
+
+        return pair;
+      };
+
+      const numberOfPairs = Math.floor(Math.random() * 4) + 2;
+      for(let i = 0; i < numberOfPairs; i++) {
+        main.appendChild(createPair());
+      }
+    });
+    </script>
+  </body>
+</html>

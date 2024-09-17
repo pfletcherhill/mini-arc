@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>009d5c81</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="pair">
+        <div class="container">
+          <div id="input-1" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-1" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-2" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-2" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-3" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-3" class="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      const main = document.querySelector("main");
+
+      for (let i = 4; i <= numPairs; i++) {
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        const inputDiv = document.createElement("div");
+        inputDiv.className = "container";
+        const inputGrid = document.createElement("div");
+        inputGrid.id = `input-${i}`;
+        inputGrid.className = "grid";
+        inputDiv.appendChild(inputGrid);
+
+        const outputDiv = document.createElement("div");
+        outputDiv.className = "container";
+        const outputGrid = document.createElement("div");
+        outputGrid.id = `output-${i}`;
+        outputGrid.className = "grid";
+        outputDiv.appendChild(outputGrid);
+
+        pairDiv.appendChild(inputDiv);
+        pairDiv.appendChild(outputDiv);
+        main.appendChild(pairDiv);
+      }
+
+      const pairs = document.querySelectorAll(".pair");
+      pairs.forEach((pair, index) => {
+        const inputGrid = pair.querySelector(`#input-${index + 1}`);
+        const outputGrid = pair.querySelector(`#output-${index + 1}`);
+
+        const gridSize = Math.floor(Math.random() * 19) + 12;
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        const smallShapeColor = colors[Math.floor(Math.random() * (colors.length - 1)) + 1];
+        const largeShapeColor = colors[Math.floor(Math.random() * (colors.length - 1)) + 1];
+
+        const patternColors = [];
+        while (patternColors.length < 3) {
+          const color = colors[Math.floor(Math.random() * (colors.length - 1)) + 1];
+          if (!patternColors.includes(color)) {
+            patternColors.push(color);
+          }
+        }
+
+        const patterns = [
+          [[1, 0, 1], [0, 1, 0], [1, 0, 1]],
+          [[1, 1, 1], [0, 1, 0], [0, 1, 0]],
+          [[1, 0, 1], [1, 1, 1], [1, 0, 1]],
+        ];
+
+        const patternIndex = Math.floor(Math.random() * patterns.length);
+        const pattern = patterns[patternIndex];
+
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            if (pattern[i][j] === 1) {
+              const pixel = document.createElement("div");
+              pixel.style.position = "absolute";
+              pixel.style.width = "1px";
+              pixel.style.height = "1px";
+              pixel.style.backgroundColor = smallShapeColor;
+              pixel.style.top = `${i}px`;
+              pixel.style.left = `${j}px`;
+              inputGrid.appendChild(pixel);
+            }
+          }
+        }
+
+        const largeShape = document.createElement("div");
+        largeShape.style.position = "absolute";
+        largeShape.style.width = "10px";
+        largeShape.style.height = "10px";
+        largeShape.style.backgroundColor = largeShapeColor;
+        largeShape.style.top = `${Math.floor(Math.random() * (gridSize - 10))}px`;
+        largeShape.style.left = `${Math.floor(Math.random() * (gridSize - 10))}px`;
+        inputGrid.appendChild(largeShape);
+
+        const outputShape = largeShape.cloneNode();
+        outputShape.style.backgroundColor = patternColors[patternIndex];
+        outputGrid.appendChild(outputShape);
+      });
+    </script>
+  </body>
+</html>

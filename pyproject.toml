@@ -17,6 +17,11 @@ tqdm = "^4.66.4"
 seaborn = "^0.13.2"
 petname = "^2.6"
 dataclasses-json = "^0.6.7"
+scikit-learn = "^1.5.1"
+selenium = "^4.24.0"
+openai = "^1.45.1"
+python-dotenv = "^1.0.1"
+anthropic = "^0.34.2"
 
 
 [build-system]

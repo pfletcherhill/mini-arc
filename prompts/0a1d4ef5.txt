@@ -1,0 +1,9 @@
+- Each input grid should be between 12x12 px and 30x30px and should be square.
+- For each input grid, follow these steps:
+  1. Pick 2-3 colors as the background colors. Reserve the rest of the colors for foreground colors.
+  2. Then draw a random pattern over the entire input grid with the 2-3 background colors, pixel by pixel.
+  3. In the foreground, lay out a table, with 2-4 columns and 2-4 rows. Columns should be 5-10px wide and all the same size with a 1px gap in between them. Rows should be 5-10px tall and all the same size with a 1px gap in between them. The borders of the table should be transparent. The table is only used to align the contents of each cell.
+  4. Inside each table cell, add a rectangle of random size from 3x3px to 10x10px, or wahtever size fits inside the cell. The rectangle should be one of the foreground colors, picked randomly.
+- For each output grid, follow these steps:
+  1. The output grid should be the same size as the foreground table in the input grid. For example, if the foreground table has 2 columns and 3 rows, then the output grid should be 2x3 px in size.
+  2. Each pixel in the output grid should be the color of the rectangle in the corresponding cell in the input grid. For example, if the top left cell in the foreground grid in the input has a yellow rectangle inside it, then the top left pixel in the output grid should be yellow.

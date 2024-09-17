@@ -1,4 +1,3 @@
-from statistics import median_grouped
 from typing import Optional
 
 import matplotlib.colors as mcolors
@@ -8,18 +7,6 @@ import seaborn as sns
 import torch
 
 from arc_prize.train import EpochState
-
-# --magenta: #E53AA3;
-# --magenta-light: #ff7bcc;
-# --red: #F93C31;
-# --blue: #1E93FF;
-# --blue-light: #87D8F1;
-# --yellow: #FFDC00;
-# --orange: #FF851B;
-# --maroon: #921231;
-# --green: #4FCC30;
-# --gray: #555555;
-# --gray-light: #999999;
 
 COLORS = [
     "#c2c0c0",  # padding grey
@@ -200,7 +187,7 @@ def visualize_mask(mask, title):
 
 def visualize_tensors(
     grids: torch.Tensor,
-    output_grid: torch.Tensor,
+    output_grid: Optional[torch.Tensor],
     prediction: Optional[torch.Tensor],
 ):
     # Create a colormap from the list of colors
@@ -251,8 +238,9 @@ def visualize_tensors(
     # Plot test output grid and prediction side by side
 
     # test_output_ax.imshow(output_grid.cpu(), cmap=cmap, vmin=0, vmax=len(COLORS) - 1)
-    plot_grid(axes[-1, 1], output_grid)
-    axes[-1, 1].set_title("Expected Output")
+    if output_grid is not None:
+        plot_grid(axes[-1, 1], output_grid)
+        axes[-1, 1].set_title("Expected Output")
 
     # Add prediction as a small subplot
     # pred_ax = fig.add_axes([0.75, 0.125, 0.2, 0.2])  # [left, bottom, width, height]

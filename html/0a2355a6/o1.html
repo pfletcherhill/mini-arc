@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0a2355a6</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main"></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const black = "#111111";
+
+        // Remove black from the colors array
+        const colorsWithoutBlack = colors.filter((color) => color !== black);
+
+        // Randomly pick a border color (excluding black)
+        const borderColor =
+          colorsWithoutBlack[
+            Math.floor(Math.random() * colorsWithoutBlack.length)
+          ];
+
+        // Remove borderColor and black from colors to get available colors for mapping
+        const availableColors = colors.filter(
+          (color) => color !== black && color !== borderColor
+        );
+
+        // Map numbers 1-6 to random colors from the available colors
+        const numbers = [1, 2, 3, 4, 5, 6];
+        const colorMapping = {};
+
+        // Copy of availableColors to prevent duplicates
+        let availableColorsCopy = [...availableColors];
+
+        numbers.forEach((number) => {
+          if (availableColorsCopy.length === 0) {
+            // Reset the available colors if we run out
+            availableColorsCopy = [...availableColors];
+          }
+          const randomIndex = Math.floor(
+            Math.random() * availableColorsCopy.length
+          );
+          colorMapping[number] = availableColorsCopy.splice(randomIndex, 1)[0];
+        });
+
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random number between 2 and 5
+
+        const main = document.getElementById("main");
+
+        for (let pairIndex = 1; pairIndex <= numPairs; pairIndex++) {
+          // Generate grid size
+          const gridWidth = Math.floor(Math.random() * 21) + 10; // Random width between 10 and 30
+          const gridHeight = Math.floor(Math.random() * 21) + 10; // Random height between 10 and 30
+
+          // Create the pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Input container
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.id = `input-${pairIndex}`;
+          inputGrid.className = "grid";
+          inputGrid.style.width = gridWidth + "px";
+          inputGrid.style.height = gridHeight + "px";
+          inputGrid.style.position = "relative";
+
+          // Output container
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.id = `output-${pairIndex}`;
+          outputGrid.className = "grid";
+          outputGrid.style.width = gridWidth + "px";
+          outputGrid.style.height = gridHeight + "px";
+          outputGrid.style.position = "relative";
+
+          const shapes = [];
+          const existingRectangles = [];
+
+          const numShapes = Math.floor(Math.random() * 5) + 1; // Between 1 and 5 shapes
+
+          for (let shapeIndex = 0; shapeIndex < numShapes; shapeIndex++) {
+            const shape = generateShape(
+              existingRectangles,
+              gridWidth,
+              gridHeight
+            );
+
+            if (shape) {
+              shapes.push(shape);
+            }
+          }
+
+          // Create rectangles in input grid
+          shapes.forEach((shape) => {
+            shape.forEach((rect) => {
+              const rectDiv = document.createElement("div");
+              rectDiv.style.position = "absolute";
+              rectDiv.style.left = rect.x + "px";
+              rectDiv.style.top = rect.y + "px";
+              rectDiv.style.width = rect.width + "px";
+              rectDiv.style.height = rect.height + "px";
+              rectDiv.style.backgroundColor = "transparent";
+              rectDiv.style.border = `1px solid ${borderColor}`;
+
+              inputGrid.appendChild(rectDiv);
+            });
+          });
+
+          // Create rectangles in output grid
+          shapes.forEach((shape) => {
+            const numRectangles = shape.length;
+            const shapeColor = colorMapping[numRectangles];
+
+            shape.forEach((rect) => {
+              const rectDiv = document.createElement("div");
+              rectDiv.style.position = "absolute";
+              rectDiv.style.left = rect.x + "px";
+              rectDiv.style.top = rect.y + "px";
+              rectDiv.style.width = rect.width + "px";
+              rectDiv.style.height = rect.height + "px";
+              rectDiv.style.backgroundColor = "transparent";
+              rectDiv.style.border = `1px solid ${shapeColor}`;
+
+              outputGrid.appendChild(rectDiv);
+            });
+          });
+
+          inputContainer.appendChild(inputGrid);
+          outputContainer.appendChild(outputGrid);
+
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          main.appendChild(pairDiv);
+        }
+
+        // Function definitions
+
+        function generateShape(existingRectangles, gridWidth, gridHeight) {
+          const shape = [];
+          const maxRectanglesInShape = 6;
+          const numRectanglesInShape =
+            Math.floor(Math.random() * maxRectanglesInShape) + 1; // Between 1 and 6
+
+          // Try to place the first rectangle
+          let attempts = 0;
+          const maxAttempts = 100;
+
+          while (attempts < maxAttempts) {
+            attempts++;
+
+            const rectWidth = Math.floor(Math.random() * 3) + 3; // Width between 3 and 5
+            const rectHeight = Math.floor(Math.random() * 3) + 3; // Height between 3 and 5
+
+            const x = Math.floor(Math.random() * (gridWidth - rectWidth));
+            const y = Math.floor(Math.random() * (gridHeight - rectHeight));
+
+            const newRect = { x, y, width: rectWidth, height: rectHeight };
+
+            if (!isOverlapping(newRect, existingRectangles)) {
+              shape.push(newRect);
+              existingRectangles.push(newRect);
+              break;
+            }
+          }
+
+          if (shape.length === 0) {
+            // Could not place the first rectangle
+            return null;
+          }
+
+          // Place subsequent rectangles in the shape
+          for (let i = 1; i < numRectanglesInShape; i++) {
+            attempts = 0;
+            while (attempts < maxAttempts) {
+              attempts++;
+
+              // Randomly pick an existing rectangle in the shape to attach to
+              const baseRect = shape[Math.floor(Math.random() * shape.length)];
+
+              const rectWidth = Math.floor(Math.random() * 3) + 3; // Width between 3 and 5
+              const rectHeight = Math.floor(Math.random() * 3) + 3; // Height between 3 and 5
+
+              // Randomly choose a side to attach to: top, bottom, left, right
+              const directions = ["top", "bottom", "left", "right"];
+              const direction =
+                directions[Math.floor(Math.random() * directions.length)];
+
+              let x, y;
+
+              if (direction === "top") {
+                x = baseRect.x + getOverlapOffset(baseRect.width, rectWidth);
+                y = baseRect.y - rectHeight + 1;
+              } else if (direction === "bottom") {
+                x = baseRect.x + getOverlapOffset(baseRect.width, rectWidth);
+                y = baseRect.y + baseRect.height - 1;
+              } else if (direction === "left") {
+                x = baseRect.x - rectWidth + 1;
+                y = baseRect.y + getOverlapOffset(baseRect.height, rectHeight);
+              } else if (direction === "right") {
+                x = baseRect.x + baseRect.width - 1;
+                y = baseRect.y + getOverlapOffset(baseRect.height, rectHeight);
+              }
+
+              const newRect = { x, y, width: rectWidth, height: rectHeight };
+
+              if (
+                isWithinGrid(newRect, gridWidth, gridHeight) &&
+                !isOverlapping(newRect, existingRectangles)
+              ) {
+                shape.push(newRect);
+                existingRectangles.push(newRect);
+                break;
+              }
+            }
+
+            if (attempts >= maxAttempts) {
+              // Could not place the rectangle, discard the shape
+              // Remove the rectangles of this shape from existingRectangles
+              shape.forEach((rect) => {
+                const index = existingRectangles.indexOf(rect);
+                if (index > -1) {
+                  existingRectangles.splice(index, 1);
+                }
+              });
+              return null;
+            }
+          }
+
+          return shape;
+        }
+
+        function isOverlapping(newRect, rectangles) {
+          for (let rect of rectangles) {
+            if (rectanglesOverlap(newRect, rect)) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function rectanglesOverlap(rect1, rect2) {
+          return !(
+            rect1.x + rect1.width <= rect2.x ||
+            rect1.x >= rect2.x + rect2.width ||
+            rect1.y + rect1.height <= rect2.y ||
+            rect1.y >= rect2.y + rect2.height
+          );
+        }
+
+        function isWithinGrid(rect, gridWidth, gridHeight) {
+          return (
+            rect.x >= 0 &&
+            rect.y >= 0 &&
+            rect.x + rect.width <= gridWidth &&
+            rect.y + rect.height <= gridHeight
+          );
+        }
+
+        function getOverlapOffset(baseSize, newSize) {
+          const minOffset = -(newSize - 1);
+          const maxOffset = baseSize - 1;
+          const offset =
+            Math.floor(Math.random() * (maxOffset - minOffset + 1)) + minOffset;
+          return offset;
+        }
+      });
+    </script>
+  </body>
+</html>
