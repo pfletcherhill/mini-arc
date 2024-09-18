@@ -1,0 +1,148 @@
+Here is the updated HTML document for puzzle 0e671a1a:
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0e671a1a</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+      .square {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+      }
+      .path {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        background-color: var(--path-color);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const main = document.querySelector("main");
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      const backgroundColor = Math.random() < 0.6 ? "#111111" : colors[Math.floor(Math.random() * colors.length)];
+      const pathColor = colors.filter(color => color !== backgroundColor)[Math.floor(Math.random() * (colors.length - 1))];
+      document.documentElement.style.setProperty("--path-color", pathColor);
+
+      for (let i = 0; i < numPairs; i++) {
+        const pair = document.createElement("div");
+        pair.classList.add("pair");
+
+        const inputContainer = document.createElement("div");
+        inputContainer.classList.add("container");
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+        inputGrid.id = `input-${i + 1}`;
+        inputGrid.style.backgroundColor = backgroundColor;
+        inputContainer.appendChild(inputGrid);
+        pair.appendChild(inputContainer);
+
+        const outputContainer = document.createElement("div");
+        outputContainer.classList.add("container");
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+        outputGrid.id = `output-${i + 1}`;
+        outputGrid.style.backgroundColor = backgroundColor;
+        outputContainer.appendChild(outputGrid);
+        pair.appendChild(outputContainer);
+
+        main.appendChild(pair);
+
+        const gridSize = Math.floor(Math.random() * 21) + 10;
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        const orderedColors = colors.filter(color => color !== backgroundColor && color !== pathColor).sort(() => 0.5 - Math.random()).slice(0, 5);
+
+        const numSquares = Math.floor(Math.random() * 4) + 2;
+        const squares = [];
+        for (let j = 0; j < numSquares; j++) {
+          const square = document.createElement("div");
+          square.classList.add("square");
+          square.style.backgroundColor = orderedColors[j];
+          const x = Math.floor(Math.random() * gridSize);
+          const y = Math.floor(Math.random() * gridSize);
+          square.style.left = `${x}px`;
+          square.style.top = `${y}px`;
+          inputGrid.appendChild(square);
+          squares.push({ x, y, color: orderedColors[j] });
+        }
+
+        squares.forEach((square, index) => {
+          const outputSquare = document.createElement("div");
+          outputSquare.classList.add("square");
+          outputSquare.style.backgroundColor = square.color;
+          outputSquare.style.left = `${square.x}px`;
+          outputSquare.style.top = `${square.y}px`;
+          outputGrid.appendChild(outputSquare);
+
+          if (index < squares.length - 1) {
+            const nextSquare = squares[index + 1];
+            const pathHorizontal = document.createElement("div");
+            pathHorizontal.classList.add("path");
+            pathHorizontal.style.left = `${square.x + 1}px`;
+            pathHorizontal.style.top = `${square.y}px`;
+            pathHorizontal.style.width = `${Math.abs(nextSquare.x - square.x) - 1}px`;
+            outputGrid.appendChild(pathHorizontal);
+
+            const pathVertical = document.createElement("div");
+            pathVertical.classList.add("path");
+            pathVertical.style.left = `${nextSquare.x}px`;
+            pathVertical.style.top = `${Math.min(square.y, nextSquare.y) + 1}px`;
+            pathVertical.style.height = `${Math.abs(nextSquare.y - square.y) - 1}px`;
+            outputGrid.appendChild(pathVertical);
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

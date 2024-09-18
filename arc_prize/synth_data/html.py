@@ -60,7 +60,8 @@ GENERAL_INSTRUCTIONS = """General Instructions:
 - Change the HTML title to the name of the puzzle
 - On each page load, pick a random number of pairs (between 2-5) and add more pairs using the pattern already in the document for the first two pairs. The number of pairs should be determined randomly with each page load.
 - Each pair should include two containers, sized 30x30 pixels each. Each container will contain an input grid div and an output grid div, which the puzzle instructions will help you define. Do not change the size of the containers, only the sizes of the grids inside them. 
-- Do not modify the CSS for main, pair, container classes. None of the classes in the template should be changed."""
+- Do not modify the CSS for main, pair, container classes. None of the classes in the template should be changed.
+- Pick a background color for all the grids, which should be black for 60% of puzzles"""
 
 WARNINGS = """Warnings:
 - Do not use a canvas, because the output will be blurry.

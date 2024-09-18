@@ -1,0 +1,8 @@
+- For each pair, input and output grids should be the same size, from 10x10px to 30x30px, though they don't have to be square.
+- Pick a background color, which for most puzzles should be black. Make the background of all grids that color.
+- Pick two more colors, a start color and a finish color, which can be any colors except the background color. Those two colors will be used by all pairs.
+- Pick a starting corner (top left, top right, bottom left, bottom right), which will be static for all pairs
+- For each pair, pick a step count, which can be anything from 1-4px.
+- For each input grid, add a 1px square in the starting color in the corner chosen above. Put the square either in the corner or 1px diagonally away from the corner. Then add 1-2 more 1px squares in the starting color moving diagonally from the original square the distance (horizontally and vertically) equal to the step count above.
+- For each output grid, copy the squares exactly from the input grid, including color, size, and position. Then continue adding more squares, though in the finish color picked above, using the same pattern (proceeding diagonally from the last square by stepping the picked distance) until there is no more space on the grid to put squares.
+- The result for each pair is that there is a dotted line of squares from the chosen starting corner to the opposing corner, with 2-3 squares in the start color and the remaining squares in the finish color.

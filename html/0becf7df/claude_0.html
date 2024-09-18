@@ -1,0 +1,181 @@
+Here is the updated HTML document for puzzle 0becf7df:
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0becf7df</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="pair">
+        <div class="container">
+          <div id="input-1" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-1" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-2" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-2" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-3" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-3" class="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black 
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      const showOutputKey = Math.random() < 0.5;
+      const backgroundColor = Math.random() < 0.6 ? "#111111" : colors[Math.floor(Math.random() * colors.length)];
+
+      for (let i = 1; i <= numPairs; i++) {
+        const inputGrid = document.getElementById(`input-${i}`);
+        const outputGrid = document.getElementById(`output-${i}`);
+
+        const gridWidth = Math.floor(Math.random() * 21) + 10;
+        const gridHeight = Math.floor(Math.random() * 21) + 10;
+        inputGrid.style.width = `${gridWidth}px`;
+        inputGrid.style.height = `${gridHeight}px`;
+        outputGrid.style.width = `${gridWidth}px`;
+        outputGrid.style.height = `${gridHeight}px`;
+
+        inputGrid.style.backgroundColor = backgroundColor;
+        outputGrid.style.backgroundColor = backgroundColor;
+
+        const pairColors = [];
+        while (pairColors.length < 4) {
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          if (color !== backgroundColor && !pairColors.includes(color)) {
+            pairColors.push(color);
+          }
+        }
+
+        const corner = Math.floor(Math.random() * 4);
+        const cornerSquare = document.createElement("div");
+        cornerSquare.style.position = "absolute";
+        cornerSquare.style.width = "2px";
+        cornerSquare.style.height = "2px";
+        cornerSquare.innerHTML = `
+          <div style="width: 1px; height: 1px; background-color: ${pairColors[0]};"></div>
+          <div style="width: 1px; height: 1px; background-color: ${pairColors[1]};"></div>
+          <div style="width: 1px; height: 1px; background-color: ${pairColors[2]};"></div>
+          <div style="width: 1px; height: 1px; background-color: ${pairColors[3]};"></div>
+        `;
+        if (corner === 0) {
+          cornerSquare.style.top = "0";
+          cornerSquare.style.left = "0";
+        } else if (corner === 1) {
+          cornerSquare.style.top = "0";
+          cornerSquare.style.right = "0";
+        } else if (corner === 2) {
+          cornerSquare.style.bottom = "0";
+          cornerSquare.style.left = "0";
+        } else {
+          cornerSquare.style.bottom = "0";
+          cornerSquare.style.right = "0";
+        }
+        inputGrid.appendChild(cornerSquare);
+        if (showOutputKey) {
+          outputGrid.appendChild(cornerSquare.cloneNode(true));
+        }
+
+        const rectWidth = Math.floor(Math.random() * 11) + 4;
+        const rectHeight = Math.floor(Math.random() * 11) + 4;
+        const rectTop = Math.floor(Math.random() * (gridHeight - rectHeight - 1)) + 1;
+        const rectLeft = Math.floor(Math.random() * (gridWidth - rectWidth - 1)) + 1;
+        const inputRect = document.createElement("div");
+        inputRect.style.position = "absolute";
+        inputRect.style.top = `${rectTop}px`;
+        inputRect.style.left = `${rectLeft}px`;
+        inputRect.style.width = `${rectWidth}px`;
+        inputRect.style.height = `${rectHeight}px`;
+        for (let y = 0; y < rectHeight; y++) {
+          for (let x = 0; x < rectWidth; x++) {
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.top = `${y}px`;
+            pixel.style.left = `${x}px`;
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            const colorIndex = Math.floor(Math.random() * 5);
+            if (colorIndex < 4) {
+              pixel.style.backgroundColor = pairColors[colorIndex];
+            }
+            inputRect.appendChild(pixel);
+          }
+        }
+        inputGrid.appendChild(inputRect);
+
+        const outputRect = inputRect.cloneNode(true);
+        const outputPixels = outputRect.children;
+        for (let j = 0; j < outputPixels.length; j++) {
+          const pixel = outputPixels[j];
+          const colorIndex = pairColors.indexOf(pixel.style.backgroundColor);
+          if (colorIndex === 0) {
+            pixel.style.backgroundColor = pairColors[1];
+          } else if (colorIndex === 1) {
+            pixel.style.backgroundColor = pairColors[0];
+          } else if (colorIndex === 2) {
+            pixel.style.backgroundColor = pairColors[3];
+          } else if (colorIndex === 3) {
+            pixel.style.backgroundColor = pairColors[2];
+          }
+        }
+        outputGrid.appendChild(outputRect);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0c9aba6e</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be dynamically generated -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Pick random number of pairs between 2 and 5
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+
+      // Pick colors
+      let backgroundColor;
+      if (Math.random() < 0.6) {
+        backgroundColor = "#111111"; // 60% chance of black
+      } else {
+        const otherColors = colors.filter((color) => color !== "#111111");
+        backgroundColor =
+          otherColors[Math.floor(Math.random() * otherColors.length)];
+      }
+
+      const availableColors = colors.filter(
+        (color) => color !== backgroundColor
+      );
+
+      function pickRandomColor(array) {
+        const index = Math.floor(Math.random() * array.length);
+        return array.splice(index, 1)[0];
+      }
+
+      const outputColor = pickRandomColor(availableColors);
+      const dividerColor = pickRandomColor(availableColors);
+      const topInputColor = pickRandomColor(availableColors);
+      const bottomInputColor = pickRandomColor(availableColors);
+
+      // Pick algorithm type
+      const algorithmType = Math.random() < 0.5 ? "OR" : "XOR";
+
+      const mainElement = document.querySelector("main");
+      mainElement.innerHTML = "";
+
+      for (let i = 1; i <= numPairs; i++) {
+        // Create pair
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+
+        const inputGrid = document.createElement("div");
+        inputGrid.id = "input-" + i;
+        inputGrid.className = "grid";
+
+        // Output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+
+        const outputGrid = document.createElement("div");
+        outputGrid.id = "output-" + i;
+        outputGrid.className = "grid";
+
+        // Append grids
+        inputContainer.appendChild(inputGrid);
+        outputContainer.appendChild(outputGrid);
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+        mainElement.appendChild(pairDiv);
+
+        // Grid sizes
+        const outputWidth = Math.floor(Math.random() * 9) + 4;
+        const outputHeight = Math.floor(Math.random() * 9) + 4;
+        const inputWidth = outputWidth;
+        const inputHeight = outputHeight * 2 + 1;
+
+        // Set grid styles
+        inputGrid.style.width = inputWidth + "px";
+        inputGrid.style.height = inputHeight + "px";
+        inputGrid.style.backgroundColor = backgroundColor;
+        inputGrid.style.position = "relative";
+
+        outputGrid.style.width = outputWidth + "px";
+        outputGrid.style.height = outputHeight + "px";
+        outputGrid.style.backgroundColor = backgroundColor;
+        outputGrid.style.position = "relative";
+
+        // Divider line
+        const dividerLine = document.createElement("div");
+        dividerLine.style.position = "absolute";
+        dividerLine.style.top = Math.floor(inputHeight / 2) + "px";
+        dividerLine.style.left = "0";
+        dividerLine.style.width = inputWidth + "px";
+        dividerLine.style.height = "1px";
+        dividerLine.style.backgroundColor = dividerColor;
+        inputGrid.appendChild(dividerLine);
+
+        // Input patterns
+        const topPixels = [];
+        const bottomPixels = [];
+
+        for (let y = 0; y < inputHeight; y++) {
+          if (y === Math.floor(inputHeight / 2)) continue;
+
+          for (let x = 0; x < inputWidth; x++) {
+            if (Math.random() < 0.5) {
+              const pixel = document.createElement("div");
+              pixel.style.position = "absolute";
+              pixel.style.width = "1px";
+              pixel.style.height = "1px";
+              pixel.style.left = x + "px";
+              pixel.style.top = y + "px";
+              if (y < Math.floor(inputHeight / 2)) {
+                pixel.style.backgroundColor = topInputColor;
+                topPixels.push({ x, y });
+              } else {
+                pixel.style.backgroundColor = bottomInputColor;
+                bottomPixels.push({ x, y });
+              }
+              inputGrid.appendChild(pixel);
+            }
+          }
+        }
+
+        // Output grid
+        for (let y = 0; y < outputHeight; y++) {
+          for (let x = 0; x < outputWidth; x++) {
+            const topY = y;
+            const bottomY = y + outputHeight + 1;
+
+            const topFilled = topPixels.some((p) => p.x === x && p.y === topY);
+            const bottomFilled = bottomPixels.some(
+              (p) => p.x === x && p.y === bottomY
+            );
+
+            let shouldFill;
+
+            if (algorithmType === "OR") {
+              shouldFill = !(topFilled || bottomFilled);
+            } else {
+              shouldFill =
+                (topFilled && bottomFilled) || (!topFilled && !bottomFilled);
+            }
+
+            if (shouldFill) {
+              const pixel = document.createElement("div");
+              pixel.style.position = "absolute";
+              pixel.style.width = "1px";
+              pixel.style.height = "1px";
+              pixel.style.left = x + "px";
+              pixel.style.top = y + "px";
+              pixel.style.backgroundColor = outputColor;
+              outputGrid.appendChild(pixel);
+            }
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+- For each puzzle, pick a quadrant (top left, top right, bottom left, bottom right) that will be the origin quadrant for all the pairs in this puzzle
+- Each input grid should be between 2x2px and 10x10px
+- For each input grid, pick 2-4 colors and make a random pattern in the grid with those colors
+- Each output grid should be twice the width and twice the height of its corresponding input grid. If the input grid is 4x5px, then the output grid should be 8x10px. 
+- For each output grid, copy the size, shape, pattern, and color of the input grid to the quadrant of the output grid indicated by the origin quadrant picked above for all pairs. Then add the same pattern to the other quadrants but flipping the pattern horizontally and/or vertically. If the origin quadrant is the bottom right, then flip the pattern horizontally for the bottom left, flip the pattern vertically for the top right, and flip the pattern both vertically and horizontally for the top left.

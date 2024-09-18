@@ -1,0 +1,11 @@
+- Pick a background color. In roughly 60% of cases, this should be black, though it can be any of the colors. Make the background of all grids that color.
+- For each input grid, follow these steps:
+  1. Pick a size from 11x11px to 30x30px, though doesn't have to be square.
+  2. Pick a divider color, which can be any color except the background color.
+  3. Pick a divider x-position and y-position, which should be picked randomly, though they must ensure that there is at least 5x5px in each quadrant made by dividing the input grid.
+  4. Draw 1px lines in the divider color at the x-position and y-position.
+  5. Pick a shape size from 3x3px to 5x5px, though it doesn't have to be square.
+  6. In each of the quadrants made by the dividers, add a rectangle in the size defined above and fill the rectangle with a random pattern using a random color, except the background color and divider color. The rectangle can be positioned anywhere in its respective quadrant, so long as it doesn't overlap the divider line or extend beyond the grid.
+- For each output grid, follow these steps:
+  1. The output grid should be twice as wide and twice as tall as the size of the shape picked in the corresponding input grid. So if in the corresponding input grid, shapes of size 3x3px were added in each quadrant, then the output grid will be 6x6px.
+  2. Copy the four shapes from the input grid exactly to the output grid. The size and color should be exactly the same, though each should fill their full respective quadrant of the output grid. 

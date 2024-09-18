@@ -1,0 +1,196 @@
+Here is the updated HTML document for puzzle 0d87d2a6:
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0d87d2a6</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="pair">
+        <div class="container">
+          <div id="input-1" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-1" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-2" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-2" class="grid"></div>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="container">
+          <div id="input-3" class="grid"></div>
+        </div>
+        <div class="container">
+          <div id="output-3" class="grid"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+      for (let i = 1; i <= numPairs; i++) {
+        const inputGrid = document.getElementById(`input-${i}`);
+        const outputGrid = document.getElementById(`output-${i}`);
+
+        const gridSize = Math.floor(Math.random() * 21) + 10;
+        inputGrid.style.width = `${gridSize}px`;
+        inputGrid.style.height = `${gridSize}px`;
+        outputGrid.style.width = `${gridSize}px`;
+        outputGrid.style.height = `${gridSize}px`;
+
+        const lineColor = colors[Math.floor(Math.random() * colors.length)];
+        const rectColor = colors[Math.floor(Math.random() * colors.length)];
+        while (lineColor === rectColor || lineColor === "#111111" || rectColor === "#111111") {
+          lineColor = colors[Math.floor(Math.random() * colors.length)];
+          rectColor = colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        const numRects = Math.floor(Math.random() * 12) + 4;
+        for (let j = 0; j < numRects; j++) {
+          const rectWidth = Math.floor(Math.random() * 9) + 2;
+          const rectHeight = Math.floor(Math.random() * 9) + 2;
+          const rectX = Math.floor(Math.random() * (gridSize - rectWidth));
+          const rectY = Math.floor(Math.random() * (gridSize - rectHeight));
+          const rect = document.createElement("div");
+          rect.style.position = "absolute";
+          rect.style.left = `${rectX}px`;
+          rect.style.top = `${rectY}px`;
+          rect.style.width = `${rectWidth}px`;
+          rect.style.height = `${rectHeight}px`;
+          rect.style.backgroundColor = rectColor;
+          inputGrid.appendChild(rect);
+          outputGrid.appendChild(rect.cloneNode());
+        }
+
+        const numHLines = Math.floor(Math.random() * 4);
+        const hLinePositions = new Set();
+        while (hLinePositions.size < numHLines) {
+          hLinePositions.add(Math.floor(Math.random() * gridSize));
+        }
+        hLinePositions.forEach(y => {
+          const leftDot = document.createElement("div");
+          leftDot.style.position = "absolute";
+          leftDot.style.left = "0";
+          leftDot.style.top = `${y}px`;
+          leftDot.style.width = "1px";
+          leftDot.style.height = "1px";
+          leftDot.style.backgroundColor = lineColor;
+          const rightDot = leftDot.cloneNode();
+          rightDot.style.left = `${gridSize - 1}px`;
+          if (!isOverlapping(leftDot, inputGrid) && !isOverlapping(rightDot, inputGrid)) {
+            inputGrid.appendChild(leftDot);
+            inputGrid.appendChild(rightDot);
+            const hLine = document.createElement("div");
+            hLine.style.position = "absolute";
+            hLine.style.left = "0";
+            hLine.style.top = `${y}px`;
+            hLine.style.width = `${gridSize}px`;
+            hLine.style.height = "1px";
+            hLine.style.backgroundColor = lineColor;
+            outputGrid.appendChild(hLine);
+            outputGrid.querySelectorAll("div").forEach(rect => {
+              if (isOverlapping(hLine, rect)) {
+                rect.style.backgroundColor = lineColor;
+              }
+            });
+          }
+        });
+
+        const numVLines = Math.floor(Math.random() * 4);
+        const vLinePositions = new Set();
+        while (vLinePositions.size < numVLines) {
+          vLinePositions.add(Math.floor(Math.random() * gridSize));
+        }
+        vLinePositions.forEach(x => {
+          const topDot = document.createElement("div");
+          topDot.style.position = "absolute";
+          topDot.style.left = `${x}px`;
+          topDot.style.top = "0";
+          topDot.style.width = "1px";
+          topDot.style.height = "1px";
+          topDot.style.backgroundColor = lineColor;
+          const bottomDot = topDot.cloneNode();
+          bottomDot.style.top = `${gridSize - 1}px`;
+          if (!isOverlapping(topDot, inputGrid) && !isOverlapping(bottomDot, inputGrid)) {
+            inputGrid.appendChild(topDot);
+            inputGrid.appendChild(bottomDot);
+            const vLine = document.createElement("div");
+            vLine.style.position = "absolute";
+            vLine.style.left = `${x}px`;
+            vLine.style.top = "0";
+            vLine.style.width = "1px";
+            vLine.style.height = `${gridSize}px`;
+            vLine.style.backgroundColor = lineColor;
+            outputGrid.appendChild(vLine);
+            outputGrid.querySelectorAll("div").forEach(rect => {
+              if (isOverlapping(vLine, rect)) {
+                rect.style.backgroundColor = lineColor;
+              }
+            });
+          }
+        });
+      }
+
+      function isOverlapping(el1, el2) {
+        const rect1 = el1.getBoundingClientRect();
+        const rect2 = el2.getBoundingClientRect();
+        return !(
+          rect1.right < rect2.left ||
+          rect1.left > rect2.right ||
+          rect1.bottom < rect2.top ||
+          rect1.top > rect2.bottom
+        );
+      }
+    </script>
+  </body>
+</html>
