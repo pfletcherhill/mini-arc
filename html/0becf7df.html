@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0becf7df</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main"></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Function to pick a random integer between min and max inclusive
+      function getRandomIntInclusive(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      // Function to shuffle an array
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      // Function to add the color key square to a grid
+      function addColorKey(grid, corner, colors) {
+        const keySize = 2;
+        const square = document.createElement("div");
+        square.style.position = "absolute";
+        square.style.width = keySize + "px";
+        square.style.height = keySize + "px";
+        square.style.display = "grid";
+        square.style.gridTemplateColumns = "1px 1px";
+        square.style.gridTemplateRows = "1px 1px";
+
+        if (corner === "top-left") {
+          square.style.left = "0px";
+          square.style.top = "0px";
+        } else if (corner === "top-right") {
+          square.style.right = "0px";
+          square.style.top = "0px";
+        } else if (corner === "bottom-left") {
+          square.style.left = "0px";
+          square.style.bottom = "0px";
+        } else if (corner === "bottom-right") {
+          square.style.right = "0px";
+          square.style.bottom = "0px";
+        }
+
+        // Create the 4 pixels
+        for (let i = 0; i < 4; i++) {
+          const pixel = document.createElement("div");
+          pixel.style.width = "1px";
+          pixel.style.height = "1px";
+          pixel.style.backgroundColor = colors[i];
+          square.appendChild(pixel);
+        }
+        grid.appendChild(square);
+      }
+
+      // Function to create rectangle with simultaneous drawing for each color
+      function createRectangle(width, height, colors) {
+        const rect = document.createElement("div");
+        rect.style.position = "absolute";
+        rect.style.width = width + "px";
+        rect.style.height = height + "px";
+        rect.style.display = "grid";
+        rect.style.gridTemplateColumns = `repeat(${width}, 1px)`;
+        rect.style.gridTemplateRows = `repeat(${height}, 1px)`;
+
+        // Initialize the grid
+        const gridPixels = [];
+        for (let y = 0; y < height; y++) {
+          gridPixels[y] = [];
+          for (let x = 0; x < width; x++) {
+            gridPixels[y][x] = null; // Uncolored
+          }
+        }
+
+        const totalPixels = width * height;
+        const minCoverage = 0.5; // 50%
+        const maxCoverage = 0.9; // 90%
+        const targetCoverage =
+          Math.random() * (maxCoverage - minCoverage) + minCoverage;
+        const targetColoredPixels = Math.floor(totalPixels * targetCoverage);
+        let coloredPixelsCount = 0;
+
+        // For each color, pick a random starting position
+        const colorQueues = [];
+        const uncoloredPositions = [];
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            uncoloredPositions.push({ x, y });
+          }
+        }
+
+        // Shuffle uncolored positions to pick random starting points
+        shuffle(uncoloredPositions);
+
+        for (let colorIndex = 0; colorIndex < colors.length; colorIndex++) {
+          // Find an uncolored starting position
+          let startPos = null;
+          while (uncoloredPositions.length > 0) {
+            const pos = uncoloredPositions.pop();
+            if (gridPixels[pos.y][pos.x] === null) {
+              startPos = pos;
+              break;
+            }
+          }
+          if (startPos) {
+            gridPixels[startPos.y][startPos.x] = {
+              colorIndex,
+              pixelElement: null,
+            };
+            coloredPixelsCount++;
+            colorQueues[colorIndex] = [startPos];
+          } else {
+            colorQueues[colorIndex] = [];
+          }
+        }
+
+        // Main loop to color the rectangle
+        while (
+          coloredPixelsCount < targetColoredPixels &&
+          colorQueues.some((queue) => queue.length > 0)
+        ) {
+          for (let colorIndex = 0; colorIndex < colors.length; colorIndex++) {
+            const queue = colorQueues[colorIndex];
+
+            if (queue.length === 0) {
+              // Try to find a new starting position
+              const availablePositions = [];
+              for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                  if (gridPixels[y][x] === null) {
+                    availablePositions.push({ x, y });
+                  }
+                }
+              }
+              if (availablePositions.length > 0) {
+                shuffle(availablePositions);
+                const newPos = availablePositions[0];
+                gridPixels[newPos.y][newPos.x] = {
+                  colorIndex,
+                  pixelElement: null,
+                };
+                coloredPixelsCount++;
+                queue.push(newPos);
+              } else {
+                continue;
+              }
+            }
+
+            // Expand from current positions
+            const currentPos = queue.shift();
+            const x = currentPos.x;
+            const y = currentPos.y;
+
+            // Get uncolored neighbors
+            const neighbors = [];
+            if (x > 0 && gridPixels[y][x - 1] === null)
+              neighbors.push({ x: x - 1, y: y });
+            if (x < width - 1 && gridPixels[y][x + 1] === null)
+              neighbors.push({ x: x + 1, y: y });
+            if (y > 0 && gridPixels[y - 1][x] === null)
+              neighbors.push({ x: x, y: y - 1 });
+            if (y < height - 1 && gridPixels[y + 1][x] === null)
+              neighbors.push({ x: x, y: y + 1 });
+
+            shuffle(neighbors);
+
+            // Decide whether to continue expanding or not
+            for (const neighbor of neighbors) {
+              if (coloredPixelsCount >= targetColoredPixels) break;
+
+              if (Math.random() < 0.7) {
+                gridPixels[neighbor.y][neighbor.x] = {
+                  colorIndex,
+                  pixelElement: null,
+                };
+                coloredPixelsCount++;
+                queue.push(neighbor);
+              }
+            }
+          }
+        }
+
+        // Create pixel elements
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const pixel = document.createElement("div");
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            const cell = gridPixels[y][x];
+            if (cell !== null) {
+              const colorIndex = cell.colorIndex;
+              pixel.style.backgroundColor = colors[colorIndex];
+              pixel.dataset.colorIndex = colorIndex; // Store color index
+            } else {
+              pixel.style.backgroundColor = "transparent";
+              pixel.dataset.colorIndex = -1; // Transparent
+            }
+            rect.appendChild(pixel);
+          }
+        }
+        return rect;
+      }
+
+      // Function to change colors in the rectangle according to the specified rules
+      function changeColors(rect, colors) {
+        const pixels = rect.children;
+        for (let i = 0; i < pixels.length; i++) {
+          const pixel = pixels[i];
+          const colorIndex = parseInt(pixel.dataset.colorIndex);
+
+          if (colorIndex === 0) {
+            pixel.style.backgroundColor = colors[1];
+            pixel.dataset.colorIndex = 1;
+          } else if (colorIndex === 1) {
+            pixel.style.backgroundColor = colors[0];
+            pixel.dataset.colorIndex = 0;
+          } else if (colorIndex === 2) {
+            pixel.style.backgroundColor = colors[3];
+            pixel.dataset.colorIndex = 3;
+          } else if (colorIndex === 3) {
+            pixel.style.backgroundColor = colors[2];
+            pixel.dataset.colorIndex = 2;
+          }
+        }
+      }
+
+      // Function to find a valid rectangle size and position
+      function findValidRectangle(
+        gridWidth,
+        gridHeight,
+        corner,
+        showOutputKey
+      ) {
+        const minRectSize = 4;
+        const maxRectSize = 14;
+        let attempts = 0;
+
+        while (attempts < 10) {
+          attempts++;
+          let rectWidth = getRandomIntInclusive(
+            minRectSize,
+            Math.min(maxRectSize, gridWidth - 2)
+          );
+          let rectHeight = getRandomIntInclusive(
+            minRectSize,
+            Math.min(maxRectSize, gridHeight - 2)
+          );
+
+          // Possible positions
+          let possibleXPositions = [];
+          let possibleYPositions = [];
+
+          for (let x = 1; x <= gridWidth - rectWidth - 1; x++) {
+            possibleXPositions.push(x);
+          }
+          for (let y = 1; y <= gridHeight - rectHeight - 1; y++) {
+            possibleYPositions.push(y);
+          }
+
+          // Remove positions that would overlap with the color key square
+          if (showOutputKey) {
+            if (corner.includes("top")) {
+              possibleYPositions = possibleYPositions.filter((y) => y >= 3);
+            }
+            if (corner.includes("left")) {
+              possibleXPositions = possibleXPositions.filter((x) => x >= 3);
+            }
+            if (corner.includes("bottom")) {
+              possibleYPositions = possibleYPositions.filter(
+                (y) => y + rectHeight <= gridHeight - 3
+              );
+            }
+            if (corner.includes("right")) {
+              possibleXPositions = possibleXPositions.filter(
+                (x) => x + rectWidth <= gridWidth - 3
+              );
+            }
+          }
+
+          if (possibleXPositions.length > 0 && possibleYPositions.length > 0) {
+            const rectX =
+              possibleXPositions[
+                getRandomIntInclusive(0, possibleXPositions.length - 1)
+              ];
+            const rectY =
+              possibleYPositions[
+                getRandomIntInclusive(0, possibleYPositions.length - 1)
+              ];
+            return { rectWidth, rectHeight, rectX, rectY };
+          }
+        }
+
+        // If no valid rectangle found after 10 attempts, return null
+        return null;
+      }
+
+      // Start of main code
+      (function () {
+        const main = document.getElementById("main");
+
+        // Decide background color
+        const backgroundColor =
+          Math.random() < 0.6
+            ? "#111111"
+            : colors.filter((color) => color !== "#111111")[
+                getRandomIntInclusive(0, colors.length - 2)
+              ];
+
+        // Remove backgroundColor from colors array for selection of colors
+        const availableColors = colors.filter(
+          (color) => color !== backgroundColor
+        );
+
+        // Set showOutputKey to true to always show the color key square
+        const showOutputKey = Math.random() < 0.5;
+
+        // Decide on the number of pairs (between 2 and 5)
+        const numPairs = getRandomIntInclusive(2, 5);
+
+        // Pick a single corner for all pairs
+        const corners = [
+          "top-left",
+          "top-right",
+          "bottom-left",
+          "bottom-right",
+        ];
+        const corner = corners[getRandomIntInclusive(0, 3)];
+
+        for (let i = 0; i < numPairs; i++) {
+          // Create the pair container
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create the input container
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.id = `input-${i + 1}`;
+          inputGrid.className = "grid";
+          inputContainer.appendChild(inputGrid);
+
+          // Create the output container
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.id = `output-${i + 1}`;
+          outputGrid.className = "grid";
+          outputContainer.appendChild(outputGrid);
+
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          main.appendChild(pairDiv);
+
+          // Determine the size of the grids
+          const gridWidth = getRandomIntInclusive(10, 30);
+          const gridHeight = getRandomIntInclusive(10, 30);
+
+          inputGrid.style.width = gridWidth + "px";
+          inputGrid.style.height = gridHeight + "px";
+          inputGrid.style.backgroundColor = backgroundColor;
+
+          outputGrid.style.width = gridWidth + "px";
+          outputGrid.style.height = gridHeight + "px";
+          outputGrid.style.backgroundColor = backgroundColor;
+
+          // For each pair, pick 4 colors
+          const shuffledColors = shuffle(availableColors.slice());
+          const pairColors = shuffledColors.slice(0, 4);
+
+          // Add a 2x2px square to the corner
+          addColorKey(inputGrid, corner, pairColors);
+          if (showOutputKey) {
+            addColorKey(outputGrid, corner, pairColors);
+          }
+
+          // Find valid rectangle size and position
+          const rectangleData = findValidRectangle(
+            gridWidth,
+            gridHeight,
+            corner,
+            showOutputKey
+          );
+
+          if (rectangleData) {
+            const { rectWidth, rectHeight, rectX, rectY } = rectangleData;
+
+            // Create rectangle in input grid
+            const inputRectangle = createRectangle(
+              rectWidth,
+              rectHeight,
+              pairColors
+            );
+            inputRectangle.style.left = rectX + "px";
+            inputRectangle.style.top = rectY + "px";
+            inputGrid.appendChild(inputRectangle);
+
+            // Create rectangle in output grid
+            const outputRectangle = inputRectangle.cloneNode(true);
+
+            // Update colors in the output rectangle
+            changeColors(outputRectangle, pairColors);
+
+            outputRectangle.style.left = rectX + "px";
+            outputRectangle.style.top = rectY + "px";
+            outputGrid.appendChild(outputRectangle);
+          } else {
+            console.warn(
+              "No valid rectangle found for grid size and corner position."
+            );
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

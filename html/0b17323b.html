@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0b17323b</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be generated dynamically -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Generate the puzzle
+      (function () {
+        // Helper functions
+        function getRandomInt(min, max) {
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandomColor(excludeColors = []) {
+          const availableColors = colors.filter(
+            (color) => !excludeColors.includes(color)
+          );
+          return availableColors[getRandomInt(0, availableColors.length - 1)];
+        }
+
+        // 1. Pick a random number of pairs between 2 and 5
+        const pairCount = getRandomInt(2, 5);
+
+        const main = document.querySelector("main");
+
+        // 2. Pick a background color (which for most puzzles should be black)
+        const backgroundColor = "#111111"; // black
+
+        // 3. Pick two more colors, startColor and finishColor, not equal to background color
+        const startColor = pickRandomColor([backgroundColor]);
+        const finishColor = pickRandomColor([backgroundColor, startColor]);
+
+        // 4. Pick a starting corner (static for all pairs)
+        const corners = [
+          "top-left",
+          "top-right",
+          "bottom-left",
+          "bottom-right",
+        ];
+        const startingCorner = corners[getRandomInt(0, corners.length - 1)];
+
+        // 5. For each pair, generate the grids and the patterns
+        for (let i = 1; i <= pairCount; i++) {
+          // Create pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Input and Output containers
+          const containerInput = document.createElement("div");
+          containerInput.className = "container";
+
+          const gridInput = document.createElement("div");
+          gridInput.id = `input-${i}`;
+          gridInput.className = "grid";
+          gridInput.style.backgroundColor = backgroundColor;
+
+          containerInput.appendChild(gridInput);
+
+          const containerOutput = document.createElement("div");
+          containerOutput.className = "container";
+
+          const gridOutput = document.createElement("div");
+          gridOutput.id = `output-${i}`;
+          gridOutput.className = "grid";
+          gridOutput.style.backgroundColor = backgroundColor;
+
+          containerOutput.appendChild(gridOutput);
+
+          // Append containers to pair div
+          pairDiv.appendChild(containerInput);
+          pairDiv.appendChild(containerOutput);
+
+          // Append pair div to main
+          main.appendChild(pairDiv);
+
+          // 6. For each pair, pick a grid size between 10x10 and 30x30 pixels (input and output grids have same size)
+          const gridWidth = getRandomInt(10, 24);
+          const gridHeight = getRandomInt(10, 24);
+
+          gridInput.style.width = gridWidth + "px";
+          gridInput.style.height = gridHeight + "px";
+
+          gridOutput.style.width = gridWidth + "px";
+          gridOutput.style.height = gridHeight + "px";
+
+          // 7. For each pair, pick a step count between 1 and 4 pixels
+          const stepCount = getRandomInt(1, 4);
+
+          // 8. For each input grid, add squares according to the instructions
+          const squaresInput = [];
+
+          // Starting position
+          let x, y;
+          if (startingCorner === "top-left") {
+            x = 0;
+            y = 0;
+          } else if (startingCorner === "top-right") {
+            x = gridWidth - 1;
+            y = 0;
+          } else if (startingCorner === "bottom-left") {
+            x = 0;
+            y = gridHeight - 1;
+          } else if (startingCorner === "bottom-right") {
+            x = gridWidth - 1;
+            y = gridHeight - 1;
+          }
+
+          // Randomly decide if the first square is in the corner or 1px diagonally away
+          const inCorner = Math.random() < 0.5;
+          if (!inCorner) {
+            if (startingCorner === "top-left") {
+              x += 1;
+              y += 1;
+            } else if (startingCorner === "top-right") {
+              x -= 1;
+              y += 1;
+            } else if (startingCorner === "bottom-left") {
+              x += 1;
+              y -= 1;
+            } else if (startingCorner === "bottom-right") {
+              x -= 1;
+              y -= 1;
+            }
+          }
+
+          // Add 1px square in starting color at (x,y)
+          squaresInput.push({ x, y, color: startColor });
+
+          // Add 1-2 more squares in starting color
+          const additionalSquaresCount = getRandomInt(1, 2);
+
+          for (let s = 0; s < additionalSquaresCount; s++) {
+            // Move x and y diagonally by stepCount
+            if (startingCorner === "top-left") {
+              x += stepCount;
+              y += stepCount;
+            } else if (startingCorner === "top-right") {
+              x -= stepCount;
+              y += stepCount;
+            } else if (startingCorner === "bottom-left") {
+              x += stepCount;
+              y -= stepCount;
+            } else if (startingCorner === "bottom-right") {
+              x -= stepCount;
+              y -= stepCount;
+            }
+
+            // Check bounds
+            if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+              squaresInput.push({ x, y, color: startColor });
+            } else {
+              break;
+            }
+          }
+
+          // 9. For each output grid, copy the squares from input grid
+          const squaresOutput = squaresInput.slice();
+
+          // Continue adding squares in finish color until no more space
+          let canAddMore = true;
+          while (canAddMore) {
+            // Move x and y diagonally by stepCount
+            if (startingCorner === "top-left") {
+              x += stepCount;
+              y += stepCount;
+            } else if (startingCorner === "top-right") {
+              x -= stepCount;
+              y += stepCount;
+            } else if (startingCorner === "bottom-left") {
+              x += stepCount;
+              y -= stepCount;
+            } else if (startingCorner === "bottom-right") {
+              x -= stepCount;
+              y -= stepCount;
+            }
+
+            // Check bounds
+            if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+              squaresOutput.push({ x, y, color: finishColor });
+            } else {
+              canAddMore = false;
+            }
+          }
+
+          // Render squares on the grids
+          function renderSquares(gridElement, squares) {
+            squares.forEach((square) => {
+              const squareDiv = document.createElement("div");
+              squareDiv.style.position = "absolute";
+              squareDiv.style.width = "1px";
+              squareDiv.style.height = "1px";
+              squareDiv.style.backgroundColor = square.color;
+              squareDiv.style.left = square.x + "px";
+              squareDiv.style.top = square.y + "px";
+              gridElement.appendChild(squareDiv);
+            });
+          }
+
+          renderSquares(gridInput, squaresInput);
+          renderSquares(gridOutput, squaresOutput);
+        }
+      })();
+    </script>
+  </body>
+</html>

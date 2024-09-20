@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0692e18c</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Define colors
+        const colors = [
+          "#111111", // black
+          "#1E93FF", // blue
+          "#F93C31", // red
+          "#4FCC30", // green
+          "#FFDC00", // yellow
+          "#E6E6E6", // grey
+          "#E53AA3", // magenta
+          "#FF851B", // orange
+          "#87D8F1", // light blue
+          "#921231", // maroon
+        ];
+
+        // Pick numPairs between 2 and 5
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random integer between 2 and 5 inclusive
+
+        // Pick hRepeat and vRepeat between 2 and 3
+        const hRepeat = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        const vRepeat = Math.floor(Math.random() * 2) + 2; // 2 or 3
+
+        // Get the main element
+        const main = document.querySelector("main");
+
+        // For each pair
+        for (let i = 1; i <= numPairs; i++) {
+          // Create the pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create the containers for input and output
+          const containerInput = document.createElement("div");
+          containerInput.className = "container";
+
+          const containerOutput = document.createElement("div");
+          containerOutput.className = "container";
+
+          // Create the grid divs
+          const inputGridDiv = document.createElement("div");
+          inputGridDiv.id = "input-" + i;
+          inputGridDiv.className = "grid";
+
+          const outputGridDiv = document.createElement("div");
+          outputGridDiv.id = "output-" + i;
+          outputGridDiv.className = "grid";
+
+          // Append grid divs to their containers
+          containerInput.appendChild(inputGridDiv);
+          containerOutput.appendChild(outputGridDiv);
+
+          // Append containers to the pair div
+          pairDiv.appendChild(containerInput);
+          pairDiv.appendChild(containerOutput);
+
+          // Append pair div to the main element
+          main.appendChild(pairDiv);
+
+          // Generate the grids
+          generateGrids(inputGridDiv, outputGridDiv, hRepeat, vRepeat, colors);
+        }
+
+        function generateGrids(
+          inputGridDiv,
+          outputGridDiv,
+          hRepeat,
+          vRepeat,
+          colors
+        ) {
+          // Pick gridWidth and gridHeight between 2 and 5
+          const gridWidth = Math.floor(Math.random() * 4) + 2; // 2 to 5 inclusive
+          const gridHeight = Math.floor(Math.random() * 4) + 2; // 2 to 5 inclusive
+
+          // Pick a color (excluding black, which is colors[0])
+          const colorIndex =
+            Math.floor(Math.random() * (colors.length - 1)) + 1;
+          const color = colors[colorIndex];
+
+          // Generate random pattern for input grid
+          const inputPattern = [];
+          for (let y = 0; y < gridHeight; y++) {
+            inputPattern[y] = [];
+            for (let x = 0; x < gridWidth; x++) {
+              // Randomly decide whether to fill the cell or not
+              inputPattern[y][x] = Math.random() < 0.5; // true for filled, false for empty
+            }
+          }
+
+          // Calculate cellSize
+          const maxCells = Math.max(gridWidth * hRepeat, gridHeight * vRepeat);
+          const cellSize = 30 / maxCells; // In pixels
+
+          // Generate the input grid
+          inputGridDiv.style.width = gridWidth * cellSize + "px";
+          inputGridDiv.style.height = gridHeight * cellSize + "px";
+          inputGridDiv.style.display = "grid";
+          inputGridDiv.style.gridTemplateColumns = `repeat(${gridWidth}, ${cellSize}px)`;
+          inputGridDiv.style.gridTemplateRows = `repeat(${gridHeight}, ${cellSize}px)`;
+
+          for (let y = 0; y < gridHeight; y++) {
+            for (let x = 0; x < gridWidth; x++) {
+              const cellDiv = document.createElement("div");
+              cellDiv.style.width = cellSize + "px";
+              cellDiv.style.height = cellSize + "px";
+              if (inputPattern[y][x]) {
+                cellDiv.style.backgroundColor = color;
+              } else {
+                cellDiv.style.backgroundColor = colors[0]; // black
+              }
+              inputGridDiv.appendChild(cellDiv);
+            }
+          }
+
+          // Generate the output grid
+          const outputGridWidth = gridWidth * hRepeat;
+          const outputGridHeight = gridHeight * vRepeat;
+
+          outputGridDiv.style.width = outputGridWidth * cellSize + "px";
+          outputGridDiv.style.height = outputGridHeight * cellSize + "px";
+          outputGridDiv.style.display = "grid";
+          outputGridDiv.style.gridTemplateColumns = `repeat(${outputGridWidth}, ${cellSize}px)`;
+          outputGridDiv.style.gridTemplateRows = `repeat(${outputGridHeight}, ${cellSize}px)`;
+
+          // For each cell in the output grid
+          for (let y = 0; y < outputGridHeight; y++) {
+            for (let x = 0; x < outputGridWidth; x++) {
+              const cellDiv = document.createElement("div");
+              cellDiv.style.width = cellSize + "px";
+              cellDiv.style.height = cellSize + "px";
+
+              // Get the corresponding cell in the input pattern
+              const inputX = x % gridWidth;
+              const inputY = y % gridHeight;
+              const inputCellFilled = inputPattern[inputY][inputX];
+
+              // Switch the color: if input cell was filled, make it black; if it was black, make it filled with the color
+              if (inputCellFilled) {
+                cellDiv.style.backgroundColor = colors[0]; // black
+              } else {
+                cellDiv.style.backgroundColor = color;
+              }
+
+              outputGridDiv.appendChild(cellDiv);
+            }
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

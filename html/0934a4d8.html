@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>0934a4d8</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        display: grid;
+        gap: 0;
+      }
+      .pixel {
+        width: 1px;
+        height: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function generatePairs() {
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random number between 2 and 5
+        const container = document.getElementById("puzzle-container");
+        container.innerHTML = ""; // Clear existing content
+
+        for (let i = 1; i <= numPairs; i++) {
+          const pairHtml = `
+            <div class="pair">
+              <div class="container">
+                <div id="input-${i}" class="grid"></div>
+              </div>
+              <div class="container">
+                <div id="output-${i}" class="grid"></div>
+              </div>
+            </div>
+          `;
+          container.innerHTML += pairHtml;
+        }
+      }
+
+      function createGrid(width, height, excludeColor) {
+        const grid = [];
+        for (let y = 0; y < height; y++) {
+          const row = [];
+          for (let x = 0; x < width; x++) {
+            let color;
+            do {
+              color = colors[Math.floor(Math.random() * colors.length)];
+            } while (color === excludeColor);
+            row.push(color);
+          }
+          grid.push(row);
+        }
+        return grid;
+      }
+
+      function mirrorGrid(grid) {
+        const height = grid.length;
+        const width = grid[0].length;
+        const mirroredGrid = [];
+
+        for (let y = 0; y < height * 2; y++) {
+          const row = [];
+          for (let x = 0; x < width * 2; x++) {
+            if (y < height) {
+              if (x < width) {
+                row.push(grid[y][x]); // Top-left (original)
+              } else {
+                row.push(grid[y][width - 1 - (x - width)]); // Top-right (horizontal flip)
+              }
+            } else {
+              if (x < width) {
+                row.push(grid[height - 1 - (y - height)][x]); // Bottom-left (vertical flip)
+              } else {
+                row.push(
+                  grid[height - 1 - (y - height)][width - 1 - (x - width)]
+                ); // Bottom-right (both flips)
+              }
+            }
+          }
+          mirroredGrid.push(row);
+        }
+
+        return mirroredGrid;
+      }
+
+      function drawGrid(gridElement, grid) {
+        gridElement.style.gridTemplateColumns = `repeat(${grid[0].length}, 1px)`;
+        gridElement.style.gridTemplateRows = `repeat(${grid.length}, 1px)`;
+        gridElement.style.width = `${grid[0].length}px`;
+        gridElement.style.height = `${grid.length}px`;
+
+        for (let y = 0; y < grid.length; y++) {
+          for (let x = 0; x < grid[y].length; x++) {
+            const pixel = document.createElement("div");
+            pixel.className = "pixel";
+            pixel.style.backgroundColor = grid[y][x];
+            gridElement.appendChild(pixel);
+          }
+        }
+      }
+
+      function addMarkerBox(gridElement, markerColor) {
+        const grid = gridElement;
+        const boxWidth = Math.floor(Math.random() * 7) + 3; // 3 to 9
+        const boxHeight = Math.floor(Math.random() * 7) + 3; // 3 to 9
+        const x = Math.floor(Math.random() * (grid.offsetWidth - boxWidth));
+        const y = Math.floor(Math.random() * (grid.offsetHeight - boxHeight));
+
+        const pixels = grid.querySelectorAll(".pixel");
+        for (let i = 0; i < pixels.length; i++) {
+          const pixelX = i % grid.offsetWidth;
+          const pixelY = Math.floor(i / grid.offsetWidth);
+          if (
+            pixelX >= x &&
+            pixelX < x + boxWidth &&
+            pixelY >= y &&
+            pixelY < y + boxHeight
+          ) {
+            pixels[i].style.backgroundColor = markerColor;
+          }
+        }
+
+        return { x, y, width: boxWidth, height: boxHeight };
+      }
+
+      function createOutputGrid(inputGrid, markerBox) {
+        const outputGrid = [];
+        for (let y = markerBox.y; y < markerBox.y + markerBox.height; y++) {
+          const row = [];
+          for (let x = markerBox.x; x < markerBox.x + markerBox.width; x++) {
+            row.push(inputGrid[y][x]);
+          }
+          outputGrid.push(row);
+        }
+        return outputGrid;
+      }
+
+      function generatePuzzle() {
+        generatePairs();
+        const markerColor = colors[Math.floor(Math.random() * colors.length)];
+
+        const pairs = document.querySelectorAll(".pair");
+        pairs.forEach((pair, index) => {
+          const inputElement = pair.querySelector(`#input-${index + 1}`);
+          const outputElement = pair.querySelector(`#output-${index + 1}`);
+
+          const baseWidth = Math.floor(Math.random() * 8) + 8; // 8 to 15
+          const baseHeight = Math.floor(Math.random() * 8) + 8; // 8 to 15
+          const baseGrid = createGrid(baseWidth, baseHeight, markerColor);
+          const fullGrid = mirrorGrid(baseGrid);
+
+          drawGrid(inputElement, fullGrid);
+          const markerBox = addMarkerBox(inputElement, markerColor);
+
+          const outputGrid = createOutputGrid(fullGrid, markerBox);
+          drawGrid(outputElement, outputGrid);
+        });
+      }
+
+      // Generate the puzzle on page load
+      window.onload = generatePuzzle;
+    </script>
+  </body>
+</html>

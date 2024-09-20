@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>03560426</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const numPairs = Math.floor(Math.random() * 4) + 2; // Random integer between 2 and 5
+      const mainElement = document.querySelector("main");
+
+      for (let i = 1; i <= numPairs; i++) {
+        // Create the pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.classList.add("pair");
+
+        // Create the first container
+        const container1 = document.createElement("div");
+        container1.classList.add("container");
+
+        // Create the input grid
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+        inputGrid.id = "input-" + i;
+
+        container1.appendChild(inputGrid);
+
+        // Create the second container
+        const container2 = document.createElement("div");
+        container2.classList.add("container");
+
+        // Create the output grid
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+        outputGrid.id = "output-" + i;
+
+        container2.appendChild(outputGrid);
+
+        // Append containers to pairDiv
+        pairDiv.appendChild(container1);
+        pairDiv.appendChild(container2);
+
+        // Append pairDiv to mainElement
+        mainElement.appendChild(pairDiv);
+
+        // For each pair, each input grid and output grid should be the same size.
+        const gridSize = Math.floor(Math.random() * 21) + 10; // 10 to 30 px
+
+        // Set the size of the grids
+        inputGrid.style.width = gridSize + "px";
+        inputGrid.style.height = gridSize + "px";
+        outputGrid.style.width = gridSize + "px";
+        outputGrid.style.height = gridSize + "px";
+
+        // Add up to 6 shapes along the bottom of the input grid
+        const maxShapes = 6;
+        const numShapes = Math.floor(Math.random() * maxShapes) + 1; // 1 to 6
+        const shapes = [];
+        let currentX = 0;
+
+        for (let j = 0; j < numShapes; j++) {
+          const shapeHeight = Math.floor(Math.random() * 4) + 2; // 2-5 px
+          const shapeWidth = Math.floor(Math.random() * 3) + 1; // 1-3 px
+
+          // Check if the shape fits in the grid
+          if (currentX + shapeWidth > gridSize) {
+            break;
+          }
+
+          // Choose a random color, excluding black
+          const colorOptions = colors.slice(1);
+          const shapeColor =
+            colorOptions[Math.floor(Math.random() * colorOptions.length)];
+
+          // Create the shape div
+          const shapeDiv = document.createElement("div");
+          shapeDiv.style.position = "absolute";
+          shapeDiv.style.width = shapeWidth + "px";
+          shapeDiv.style.height = shapeHeight + "px";
+          shapeDiv.style.backgroundColor = shapeColor;
+          shapeDiv.style.bottom = "0px";
+          shapeDiv.style.left = currentX + "px";
+
+          // Add the shape to the input grid
+          inputGrid.appendChild(shapeDiv);
+
+          // Store the shape's properties
+          shapes.push({
+            width: shapeWidth,
+            height: shapeHeight,
+            color: shapeColor,
+          });
+
+          // Update currentX for the next shape
+          currentX += shapeWidth + 1;
+        }
+
+        // Reposition shapes in the output grid
+        let prevShapeRight = 0;
+        let prevShapeBottom = 0;
+
+        for (let k = 0; k < shapes.length; k++) {
+          const shape = shapes[k];
+
+          // Create the shape div
+          const shapeDiv = document.createElement("div");
+          shapeDiv.style.position = "absolute";
+          shapeDiv.style.width = shape.width + "px";
+          shapeDiv.style.height = shape.height + "px";
+          shapeDiv.style.backgroundColor = shape.color;
+
+          if (k === 0) {
+            // Align the first shape to the top left corner
+            shapeDiv.style.top = "0px";
+            shapeDiv.style.left = "0px";
+            prevShapeRight = shape.width;
+            prevShapeBottom = shape.height;
+          } else {
+            // Position overlapping the previous shape by 1px
+            const left = prevShapeRight - 1;
+            const top = prevShapeBottom - 1;
+
+            // Check if the shape fits in the grid
+            if (
+              left + shape.width > gridSize ||
+              top + shape.height > gridSize
+            ) {
+              break;
+            }
+
+            shapeDiv.style.left = left + "px";
+            shapeDiv.style.top = top + "px";
+            prevShapeRight = left + shape.width;
+            prevShapeBottom = top + shape.height;
+          }
+
+          // Add the shape to the output grid
+          outputGrid.appendChild(shapeDiv);
+        }
+      }
+    </script>
+  </body>
+</html>
