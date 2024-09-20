@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 import anthropic
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 from dotenv import load_dotenv
@@ -31,6 +32,8 @@ COLORS = [
     "#87D8F1",  # light blue
     "#921231",  # maroon
 ]
+
+PADDING_COLOR = COLORS[0]
 
 
 def read_file(file_path: str) -> str:
@@ -170,7 +173,6 @@ def match_color(color, defined_colors):
 def process_screenshot(screenshot, grid_size=(2, 5), cell_size=30):
     image_data = base64.b64decode(screenshot)
     image = Image.open(io.BytesIO(image_data))
-    print(image, image.size)
 
     grid = []
     for row in range(grid_size[1]):
@@ -181,8 +183,6 @@ def process_screenshot(screenshot, grid_size=(2, 5), cell_size=30):
             right = left + cell_size
             bottom = top + cell_size
 
-            print("crop", left, top, right, bottom)
-
             cell = image.crop((left, top, right, bottom))
             pixel_representation = []
             for y in range(cell_size):
@@ -191,11 +191,15 @@ def process_screenshot(screenshot, grid_size=(2, 5), cell_size=30):
                     pixel = cell.getpixel((x, y))
                     hex_color = rgb_to_hex(pixel)
                     matched_color = match_color(hex_color, COLORS)
-                    # print(f"pixel ({x}, {y}): {pixel}")
-                    pixel_row.append(matched_color)
-                pixel_representation.append(pixel_row)
-            grid_row.append(pixel_representation)
-        grid.append(grid_row)
+                    matched_color_i = list.index(COLORS, matched_color)
+                    if matched_color_i > 0:
+                        pixel_row.append(matched_color_i - 1)
+                if len(pixel_row) > 0:
+                    pixel_representation.append(pixel_row)
+            if len(pixel_representation) > 0:
+                grid_row.append(pixel_representation)
+        if len(grid_row) > 0:
+            grid.append(grid_row)
 
     return grid, image
 
@@ -204,20 +208,13 @@ def display_images(image, grid):
     fig, axes = plt.subplots(5, 2, figsize=(10, 25))
     fig.suptitle("Grid of 30x30 Images", fontsize=16)
 
-    for row in range(5):
-        for col in range(2):
-            cell_data = np.array(
-                [
-                    [
-                        tuple(int(color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
-                        for color in row
-                    ]
-                    for row in grid[row][col]
-                ]
-            )
-            axes[row, col].imshow(cell_data.astype(np.uint8))
-            axes[row, col].axis("off")
-            axes[row, col].set_title(f"Cell ({row+1}, {col+1})")
+    cmap = mcolors.ListedColormap(COLORS[1:])
+    for i, row in enumerate(grid):
+        for j, cell in enumerate(row):
+            print(i, j, cell)
+            axes[i, j].imshow(cell, cmap=cmap, vmin=0, vmax=(len(COLORS) - 2))
+            axes[i, j].axis("off")
+            axes[i, j].set_title(f"Cell ({i+1}, {j+1})")
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
