@@ -42,6 +42,8 @@ def get_web_driver(width: int, height: int):
         },
     )
 
+    driver.set_page_load_timeout(5)
+
     return driver
 
 

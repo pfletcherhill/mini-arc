@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>103eff5b</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getRandomColor() {
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      function createPair(index) {
+        return `
+          <div class="pair">
+            <div class="container">
+              <div id="input-${index}" class="grid"></div>
+            </div>
+            <div class="container">
+              <div id="output-${index}" class="grid"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      function generatePuzzle() {
+        const numPairs = getRandomInt(2, 5);
+        const puzzleContainer = document.getElementById("puzzle-container");
+        puzzleContainer.innerHTML = "";
+
+        for (let i = 1; i <= numPairs; i++) {
+          puzzleContainer.innerHTML += createPair(i);
+        }
+
+        const backgroundColor =
+          Math.random() < 0.6 ? "#111111" : getRandomColor();
+        let fillColor;
+        do {
+          fillColor = getRandomColor();
+        } while (fillColor === backgroundColor);
+
+        const rotation = [0, 90, 180, 270][Math.floor(Math.random() * 4)];
+
+        for (let i = 1; i <= numPairs; i++) {
+          const inputGrid = document.getElementById(`input-${i}`);
+          const outputGrid = document.getElementById(`output-${i}`);
+
+          const gridSize = {
+            width: getRandomInt(12, 30),
+            height: getRandomInt(12, 30),
+          };
+
+          inputGrid.style.width =
+            outputGrid.style.width = `${gridSize.width}px`;
+          inputGrid.style.height =
+            outputGrid.style.height = `${gridSize.height}px`;
+          inputGrid.style.backgroundColor = outputGrid.style.backgroundColor =
+            backgroundColor;
+
+          const smallRectSize = {
+            width: getRandomInt(3, 5),
+            height: getRandomInt(3, 5),
+          };
+
+          const largeRectSize = {
+            width: smallRectSize.width * 2,
+            height: smallRectSize.height * 2,
+          };
+
+          const patternColors = [];
+          while (patternColors.length < getRandomInt(3, 4)) {
+            const color = getRandomColor();
+            if (
+              color !== backgroundColor &&
+              color !== fillColor &&
+              !patternColors.includes(color)
+            ) {
+              patternColors.push(color);
+            }
+          }
+
+          const smallRectPattern = generatePattern(
+            smallRectSize,
+            patternColors
+          );
+          const largeRectPattern = scalePattern(smallRectPattern, 2);
+
+          const smallRectPosition = {
+            x: getRandomInt(0, gridSize.width - smallRectSize.width),
+            y: getRandomInt(0, gridSize.height - smallRectSize.height),
+          };
+
+          // Fix: Use a more robust method to place the large rectangle
+          const largeRectPosition = findNonOverlappingPosition(
+            gridSize,
+            smallRectPosition,
+            smallRectSize,
+            largeRectSize
+          );
+
+          if (largeRectPosition) {
+            drawRectangle(
+              inputGrid,
+              smallRectPosition,
+              smallRectSize,
+              smallRectPattern
+            );
+            drawRectangle(
+              inputGrid,
+              largeRectPosition,
+              largeRectSize,
+              largeRectPattern,
+              fillColor,
+              rotation,
+              true
+            );
+
+            drawRectangle(
+              outputGrid,
+              smallRectPosition,
+              smallRectSize,
+              smallRectPattern
+            );
+            drawRectangle(
+              outputGrid,
+              largeRectPosition,
+              largeRectSize,
+              largeRectPattern,
+              null,
+              rotation
+            );
+          } else {
+            // If we can't place the large rectangle, regenerate the puzzle
+            i--;
+            continue;
+          }
+        }
+      }
+
+      function findNonOverlappingPosition(
+        gridSize,
+        smallRectPos,
+        smallRectSize,
+        largeRectSize
+      ) {
+        const maxAttempts = 100;
+        for (let i = 0; i < maxAttempts; i++) {
+          const pos = {
+            x: getRandomInt(0, gridSize.width - largeRectSize.width),
+            y: getRandomInt(0, gridSize.height - largeRectSize.height),
+          };
+          if (
+            !rectanglesOverlap(smallRectPos, smallRectSize, pos, largeRectSize)
+          ) {
+            return pos;
+          }
+        }
+        return null; // Couldn't find a non-overlapping position
+      }
+
+      function generatePattern(size, colors) {
+        const pattern = Array(size.height)
+          .fill()
+          .map(() => Array(size.width).fill(null));
+        const totalPixels = size.width * size.height;
+        const pixelsToFill = Math.floor(
+          totalPixels * (0.7 + Math.random() * 0.1)
+        );
+
+        for (let i = 0; i < pixelsToFill; i++) {
+          const color = colors[i % colors.length];
+          let x, y;
+          do {
+            x = Math.floor(Math.random() * size.width);
+            y = Math.floor(Math.random() * size.height);
+          } while (pattern[y][x] !== null);
+
+          pattern[y][x] = color;
+
+          // Try to place adjacent pixels of the same color
+          for (let j = 0; j < 2; j++) {
+            const dx = [-1, 1, 0, 0][Math.floor(Math.random() * 4)];
+            const dy = [0, 0, -1, 1][Math.floor(Math.random() * 4)];
+            const newX = x + dx;
+            const newY = y + dy;
+            if (
+              newX >= 0 &&
+              newX < size.width &&
+              newY >= 0 &&
+              newY < size.height &&
+              pattern[newY][newX] === null
+            ) {
+              pattern[newY][newX] = color;
+              i++;
+            }
+          }
+        }
+
+        return pattern;
+      }
+
+      function scalePattern(pattern, scale) {
+        const newPattern = [];
+        for (let y = 0; y < pattern.length; y++) {
+          for (let sy = 0; sy < scale; sy++) {
+            const newRow = [];
+            for (let x = 0; x < pattern[y].length; x++) {
+              for (let sx = 0; sx < scale; sx++) {
+                newRow.push(pattern[y][x]);
+              }
+            }
+            newPattern.push(newRow);
+          }
+        }
+        return newPattern;
+      }
+
+      function rectanglesOverlap(pos1, size1, pos2, size2) {
+        return (
+          pos1.x < pos2.x + size2.width &&
+          pos1.x + size1.width > pos2.x &&
+          pos1.y < pos2.y + size2.height &&
+          pos1.y + size1.height > pos2.y
+        );
+      }
+
+      function drawRectangle(
+        grid,
+        position,
+        size,
+        pattern,
+        fillColor = null,
+        rotation = 0,
+        inputLargeRect = false
+      ) {
+        const rectangle = document.createElement("div");
+        rectangle.style.position = "absolute";
+        rectangle.style.left = `${position.x}px`;
+        rectangle.style.top = `${position.y}px`;
+        rectangle.style.width = `${size.width}px`;
+        rectangle.style.height = `${size.height}px`;
+        rectangle.style.transform = `rotate(${rotation}deg)`;
+        rectangle.style.transformOrigin = "center";
+
+        for (let y = 0; y < pattern.length; y++) {
+          for (let x = 0; x < pattern[y].length; x++) {
+            if (pattern[y][x] !== null) {
+              const pixel = document.createElement("div");
+              pixel.style.position = "absolute";
+              pixel.style.left = `${x}px`;
+              pixel.style.top = `${y}px`;
+              pixel.style.width = "1px";
+              pixel.style.height = "1px";
+              pixel.style.backgroundColor = inputLargeRect
+                ? fillColor
+                : pattern[y][x];
+              rectangle.appendChild(pixel);
+            }
+          }
+        }
+
+        grid.appendChild(rectangle);
+      }
+
+      window.onload = generatePuzzle;
+    </script>
+  </body>
+</html>

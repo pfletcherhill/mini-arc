@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>11e1fe23</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically generated here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getRandomColor(excludeColor) {
+        let color;
+        do {
+          color = colors[Math.floor(Math.random() * colors.length)];
+        } while (color === excludeColor);
+        return color;
+      }
+
+      function createPair(
+        pairIndex,
+        backgroundColor,
+        centerColor,
+        diagonalSteps
+      ) {
+        const pair = document.createElement("div");
+        pair.className = "pair";
+
+        const gridSize = {
+          width: getRandomInt(10, 30),
+          height: getRandomInt(10, 30),
+        };
+
+        let squareSize = Math.min(
+          getRandomInt(5, 25),
+          gridSize.width - 2,
+          gridSize.height - 2
+        );
+
+        if (squareSize % 2 === 0) squareSize--; // Ensure odd size
+
+        const squarePosition = {
+          left: getRandomInt(0, gridSize.width - squareSize),
+          top: getRandomInt(0, gridSize.height - squareSize),
+        };
+
+        const corners = [
+          [0, 0, "top-left"],
+          [0, squareSize - 1, "bottom-left"],
+          [squareSize - 1, 0, "top-right"],
+          [squareSize - 1, squareSize - 1, "bottom-right"],
+        ];
+        const selectedCorners = corners
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 3);
+        const cornerColors = selectedCorners.map(() =>
+          getRandomColor(backgroundColor)
+        );
+
+        for (let i = 0; i < 2; i++) {
+          const container = document.createElement("div");
+          container.className = "container";
+
+          const grid = document.createElement("div");
+          grid.id = i === 0 ? `input-${pairIndex}` : `output-${pairIndex}`;
+          grid.className = "grid";
+          grid.style.width = `${gridSize.width}px`;
+          grid.style.height = `${gridSize.height}px`;
+          grid.style.backgroundColor = backgroundColor;
+
+          const square = document.createElement("div");
+          square.style.position = "absolute";
+          square.style.width = `${squareSize}px`;
+          square.style.height = `${squareSize}px`;
+          square.style.left = `${squarePosition.left}px`;
+          square.style.top = `${squarePosition.top}px`;
+          square.style.backgroundColor = "transparent";
+
+          // Draw colored corners
+          selectedCorners.forEach((corner, index) => {
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            pixel.style.left = `${corner[0]}px`;
+            pixel.style.top = `${corner[1]}px`;
+            pixel.style.backgroundColor = cornerColors[index];
+            square.appendChild(pixel);
+          });
+
+          if (i === 1) {
+            // Output grid
+            // Draw center pixel
+            const centerPixel = document.createElement("div");
+            centerPixel.style.position = "absolute";
+            centerPixel.style.width = "1px";
+            centerPixel.style.height = "1px";
+            centerPixel.style.left = `${Math.floor(squareSize / 2)}px`;
+            centerPixel.style.top = `${Math.floor(squareSize / 2)}px`;
+            centerPixel.style.backgroundColor = centerColor;
+            square.appendChild(centerPixel);
+
+            // Draw diagonals
+            selectedCorners.forEach((corner, index) => {
+              const dx = corner[2].includes("right") ? 1 : -1;
+              const dy = corner[2].includes("bottom") ? 1 : -1;
+              let x = Math.floor(squareSize / 2) + dx;
+              let y = Math.floor(squareSize / 2) + dy;
+
+              for (
+                let step = 0;
+                step < diagonalSteps &&
+                x >= 0 &&
+                x < squareSize &&
+                y >= 0 &&
+                y < squareSize;
+                step++
+              ) {
+                const pixel = document.createElement("div");
+                pixel.style.position = "absolute";
+                pixel.style.width = "1px";
+                pixel.style.height = "1px";
+                pixel.style.left = `${x}px`;
+                pixel.style.top = `${y}px`;
+                pixel.style.backgroundColor = cornerColors[index];
+                square.appendChild(pixel);
+                if (x === corner[0] && y === corner[1]) break;
+                x += dx;
+                y += dy;
+              }
+            });
+          }
+
+          grid.appendChild(square);
+          container.appendChild(grid);
+          pair.appendChild(container);
+        }
+
+        return pair;
+      }
+
+      function generatePuzzle() {
+        const container = document.getElementById("puzzle-container");
+        const numPairs = getRandomInt(2, 5);
+        const backgroundColor =
+          Math.random() < 0.6 ? "#111111" : getRandomColor();
+        const centerColor = getRandomColor(backgroundColor);
+        const diagonalSteps = Math.random() < 0.5 ? 1 : Infinity; // Either 1 step or full diagonal
+
+        for (let i = 1; i <= numPairs; i++) {
+          container.appendChild(
+            createPair(i, backgroundColor, centerColor, diagonalSteps)
+          );
+        }
+      }
+
+      generatePuzzle();
+    </script>
+  </body>
+</html>
