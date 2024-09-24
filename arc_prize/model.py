@@ -81,10 +81,13 @@ class EncoderLayerWithAttention(nn.TransformerEncoderLayer):
             is_causal=is_causal,
             average_attn_weights=False,
         )
-        x = self.norm1(x + self.dropout1(x1))
-        x2 = self.linear2(self.dropout(self.activation(self.linear1(x))))
 
-        x = self.norm2(x + self.dropout2(x2))
+        x.add_(self.dropout1(x1))
+        x = self.norm1(x)
+
+        x1 = self.linear2(self.dropout(self.activation(self.linear1(x))))
+        x.add_(self.dropout2(x1))
+        x = self.norm2(x)
 
         return x, attn_weights
 
@@ -170,7 +173,8 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
             is_causal=tgt_is_causal,
             need_weights=need_weights,
         )
-        x = self.norm1(x + x_sa)
+        x = x + x_sa
+        x = self.norm1(x)
 
         x_mha, mha_attn_weights = self._mha_block(
             x,
@@ -180,8 +184,11 @@ class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
             is_causal=memory_is_causal,
             need_weights=need_weights,
         )
-        x = self.norm2(x + x_mha)
-        x = self.norm3(x + self._ff_block(x))
+        x = x + x_mha
+        x = self.norm2(x)
+
+        x = x + self._ff_block(x)
+        x = self.norm3(x)
 
         return x, sa_attn_weights, mha_attn_weights
 
@@ -342,9 +349,10 @@ class ARCTransformerEncoderDecoder(nn.Module):
     ]:
         batch_size = src.shape[0]
 
-        src = self.embedding(src)
+        src = self.embedding.forward(src)
 
-        src = self.pos_encoding(src)
+        pos_emb = self.pos_encoding.forward(src)
+        src.add_(pos_emb)
 
         src = src.view(batch_size, self.seq_len, self.d_model)
 
@@ -680,39 +688,50 @@ class ARCPositionalEncoding(nn.Module):
             self.num_train_pairs + 1, d_model // 4
         )  # +1 for test pair
 
-    def forward(self, x):
-        batch_size, num_grids, height, width, _ = x.size()
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        _, num_grids, height, width, _ = x.size()
+        device = x.device
 
-        row_pos = torch.arange(height, device=x.device).unsqueeze(1).expand(-1, width)
-        col_pos = torch.arange(width, device=x.device).unsqueeze(0).expand(height, -1)
-
-        row_emb = self.row_embedding(row_pos)
-        col_emb = self.col_embedding(col_pos)
-
-        pos_emb = torch.cat([row_emb, col_emb], dim=-1)
-
-        pos_emb = (
-            pos_emb.unsqueeze(0).unsqueeze(0).expand(batch_size, num_grids, -1, -1, -1)
+        # Row pos embedding
+        row_pos = torch.arange(height, device=device)
+        row_emb = (
+            self.row_embedding.forward(row_pos)
+            .unsqueeze(1)
+            .expand(num_grids, -1, width, -1)
         )
 
-        grid_indices = (
-            torch.arange(num_grids, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        # Column pos embedding
+        col_pos = torch.arange(width, device=device)
+        col_emb = (
+            self.col_embedding.forward(col_pos)
+            .unsqueeze(0)
+            .expand(num_grids, height, -1, -1)
         )
 
+        # Input/output embedding
+        grid_indices = torch.arange(num_grids, device=device)
         is_output = (grid_indices % 2 == 1).long()
-        io_emb = self.input_output_embedding(is_output)
+        io_emb = (
+            self.input_output_embedding(is_output)
+            .unsqueeze(1)
+            .unsqueeze(1)
+            .expand(num_grids, height, width, -1)
+        )
 
+        # Pair embedding
         pair_indices = torch.div(grid_indices, 2, rounding_mode="floor")
+        pair_indices[-1] = self.num_train_pairs
+        pair_emb = (
+            self.pair_embedding(pair_indices)
+            .unsqueeze(1)
+            .unsqueeze(1)
+            .expand(num_grids, height, width, -1)
+        )
 
-        pair_indices[:, -1] = self.num_train_pairs
-        pair_emb = self.pair_embedding(pair_indices)
+        # Combine all embeddings (1, num_grids, height, width, d_model)
+        combined_emb = torch.cat([row_emb, col_emb, io_emb, pair_emb], dim=-1)
 
-        io_emb = io_emb.unsqueeze(2).unsqueeze(2).expand(-1, -1, height, width, -1)
-        pair_emb = pair_emb.unsqueeze(2).unsqueeze(2).expand(-1, -1, height, width, -1)
-
-        combined_emb = torch.cat([pos_emb, io_emb, pair_emb], dim=-1)
-
-        return x + combined_emb
+        return combined_emb
 
 
 class HybridARCPositionalEncoding(nn.Module):

@@ -5,6 +5,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.amp.autocast_mode import autocast
+from torch.amp.grad_scaler import GradScaler
 
 from arc_prize.data import (
     ARCDatasetParams,
@@ -109,11 +111,6 @@ def train_arc_transformer(
         train_params.batch_size,
         dataset_params,
     )
-    # train_loader, val_loader = make_re_arc_data_loaders(
-    #     checkpoint.train_params.dataset_dir,
-    #     checkpoint.train_params.batch_size,
-    #     dataset_params,
-    # )
 
     print(
         f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items"
@@ -134,6 +131,8 @@ def train_arc_transformer(
     )
     if checkpoint.optimizer_state_dict is not None:
         optimizer.load_state_dict(checkpoint.optimizer_state_dict)
+
+    scaler = GradScaler(device.type)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=5
@@ -157,22 +156,24 @@ def train_arc_transformer(
             grids, masks, target_grid = [item.to(device) for item in batch]
 
             optimizer.zero_grad()
-            output = parallel_model.forward(grids, masks)[0]
 
-            loss = criterion(
-                output.view(-1, parallel_model.module.num_classes),
-                target_grid.view(-1).long(),
-            )
-            loss.backward()
+            with autocast(device.type):
+                output = parallel_model.forward(grids, masks)[0]
+                loss = criterion(
+                    output.view(-1, parallel_model.module.num_classes),
+                    target_grid.view(-1).long(),
+                )
 
-            # Gradient clipping
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # Use the scaler for backpropagation and optimization
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
-            optimizer.step()
+            # loss.backward()
+            # optimizer.step()
 
             train_loss += loss.item()
 
-            # Calculate accuracy
             predictions = torch.argmax(output, dim=-1)
             train_accuracy += (predictions == target_grid).float().mean().item()
 
@@ -188,11 +189,12 @@ def train_arc_transformer(
                 # grids, masks, target_grid = batch
                 grids, masks, target_grid = [item.to(device) for item in batch]
 
-                output = parallel_model.forward(grids, masks)[0]
-                loss = criterion(
-                    output.view(-1, parallel_model.module.num_classes),
-                    target_grid.view(-1).long(),
-                )
+                with autocast(device.type):
+                    output = parallel_model.forward(grids, masks)[0]
+                    loss = criterion(
+                        output.view(-1, parallel_model.module.num_classes),
+                        target_grid.view(-1).long(),
+                    )
 
                 val_loss += loss.item()
 
