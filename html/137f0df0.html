@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>137f0df0</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function pickRandomColor(excludeColors = []) {
+        const availableColors = colors.filter(
+          (color) => !excludeColors.includes(color)
+        );
+        return availableColors[
+          Math.floor(Math.random() * availableColors.length)
+        ];
+      }
+
+      function sum(arr) {
+        return arr.reduce((a, b) => a + b, 0);
+      }
+
+      function generateGridParams() {
+        let attempts = 0;
+        while (attempts < 10) {
+          const rows = Math.floor(Math.random() * 3) + 2; // 2 to 4
+          const columns = Math.floor(Math.random() * 3) + 2; // 2 to 4
+          const boxWidth = Math.floor(Math.random() * 2) + 2; // 2 to 3
+          const boxHeight = Math.floor(Math.random() * 2) + 2; // 2 to 3
+
+          const columnGaps = [];
+          for (let c = 0; c < columns - 1; c++) {
+            columnGaps.push(Math.floor(Math.random() * 3) + 1); // 1 to 3
+          }
+
+          const rowGaps = [];
+          for (let r = 0; r < rows - 1; r++) {
+            rowGaps.push(Math.floor(Math.random() * 3) + 1); // 1 to 3
+          }
+
+          // Add margins (0 to 2 pixels)
+          const leftMargin = Math.floor(Math.random() * 3); // 0 to 2
+          const rightMargin = Math.floor(Math.random() * 3); // 0 to 2
+          const topMargin = Math.floor(Math.random() * 3); // 0 to 2
+          const bottomMargin = Math.floor(Math.random() * 3); // 0 to 2
+
+          const totalBoxWidth =
+            leftMargin + boxWidth * columns + sum(columnGaps) + rightMargin;
+          const totalBoxHeight =
+            topMargin + boxHeight * rows + sum(rowGaps) + bottomMargin;
+
+          if (
+            totalBoxWidth >= 10 &&
+            totalBoxWidth <= 20 &&
+            totalBoxHeight >= 10 &&
+            totalBoxHeight <= 20
+          ) {
+            return {
+              rows,
+              columns,
+              boxWidth,
+              boxHeight,
+              columnGaps,
+              rowGaps,
+              leftMargin,
+              rightMargin,
+              topMargin,
+              bottomMargin,
+              totalBoxWidth,
+              totalBoxHeight,
+            };
+          }
+          attempts++;
+        }
+        // If after 10 attempts we didn't find acceptable parameters, return default values
+        return {
+          rows: 2,
+          columns: 2,
+          boxWidth: 3,
+          boxHeight: 3,
+          columnGaps: [1],
+          rowGaps: [1],
+          leftMargin: 1,
+          rightMargin: 1,
+          topMargin: 1,
+          bottomMargin: 1,
+          totalBoxWidth: 10,
+          totalBoxHeight: 10,
+        };
+      }
+
+      // Main execution
+      (function () {
+        const main = document.querySelector("main");
+
+        // Decide background color (60% chance of being black)
+        let backgroundColor;
+        if (Math.random() < 0.6) {
+          backgroundColor = "#111111"; // black
+        } else {
+          backgroundColor = pickRandomColor();
+        }
+
+        // Pick box color, inside color, outside color
+        const boxColor = pickRandomColor([backgroundColor]);
+        const insideColor = pickRandomColor([backgroundColor, boxColor]);
+        const outsideColor = pickRandomColor([
+          backgroundColor,
+          boxColor,
+          insideColor,
+        ]);
+
+        // Number of pairs (2 to 5)
+        const numPairs = Math.floor(Math.random() * 4) + 2;
+
+        for (let i = 1; i <= numPairs; i++) {
+          // Create pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create input container and grid
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.id = `input-${i}`;
+          inputGrid.className = "grid";
+          inputContainer.appendChild(inputGrid);
+
+          // Create output container and grid
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.id = `output-${i}`;
+          outputGrid.className = "grid";
+          outputContainer.appendChild(outputGrid);
+
+          // Append containers to pair div
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pair div to main
+          main.appendChild(pairDiv);
+
+          // Generate grid parameters
+          const params = generateGridParams();
+          const {
+            rows,
+            columns,
+            boxWidth,
+            boxHeight,
+            columnGaps,
+            rowGaps,
+            leftMargin,
+            rightMargin,
+            topMargin,
+            bottomMargin,
+            totalBoxWidth,
+            totalBoxHeight,
+          } = params;
+
+          // Set grid sizes
+          inputGrid.style.width = totalBoxWidth + "px";
+          inputGrid.style.height = totalBoxHeight + "px";
+          inputGrid.style.position = "relative";
+          inputGrid.style.backgroundColor = backgroundColor;
+
+          outputGrid.style.width = totalBoxWidth + "px";
+          outputGrid.style.height = totalBoxHeight + "px";
+          outputGrid.style.position = "relative";
+          outputGrid.style.backgroundColor = backgroundColor;
+
+          // ***** Output Grid Construction *****
+
+          // Arrays to control layering
+          const outsideElements = [];
+          const insideElements = [];
+          const boxElements = [];
+
+          // Calculate positions for gaps and boxes
+          const boxPositions = [];
+          let y = topMargin;
+          for (let r = 0; r < rows; r++) {
+            let x = leftMargin;
+            for (let c = 0; c < columns; c++) {
+              boxPositions.push({ x, y });
+              x += boxWidth;
+              if (c < columns - 1) {
+                x += columnGaps[c];
+              }
+            }
+            y += boxHeight;
+            if (r < rows - 1) {
+              y += rowGaps[r];
+            }
+          }
+
+          // Step 1: Draw outside color rectangles (behind everything else)
+
+          // Vertical gaps (between columns)
+          let xGap = leftMargin;
+          for (let c = 0; c < columns - 1; c++) {
+            xGap += boxWidth;
+            const gapWidth = columnGaps[c];
+
+            const outsideRect = document.createElement("div");
+            outsideRect.style.position = "absolute";
+            outsideRect.style.left = xGap + "px";
+            outsideRect.style.top = "0px";
+            outsideRect.style.width = gapWidth + "px";
+            outsideRect.style.height = totalBoxHeight + "px";
+            outsideRect.style.backgroundColor = outsideColor;
+            outsideElements.push(outsideRect);
+
+            xGap += gapWidth;
+          }
+
+          // Horizontal gaps (between rows)
+          let yGap = topMargin;
+          for (let r = 0; r < rows - 1; r++) {
+            yGap += boxHeight;
+            const gapHeight = rowGaps[r];
+
+            const outsideRect = document.createElement("div");
+            outsideRect.style.position = "absolute";
+            outsideRect.style.left = "0px";
+            outsideRect.style.top = yGap + "px";
+            outsideRect.style.width = totalBoxWidth + "px";
+            outsideRect.style.height = gapHeight + "px";
+            outsideRect.style.backgroundColor = outsideColor;
+            outsideElements.push(outsideRect);
+
+            yGap += gapHeight;
+          }
+
+          // Step 2: Draw inside color gaps (between boxes)
+
+          // Vertical gaps (between columns)
+          xGap = leftMargin;
+          for (let c = 0; c < columns - 1; c++) {
+            xGap += boxWidth;
+            const gapWidth = columnGaps[c];
+
+            const vGap = document.createElement("div");
+            vGap.style.position = "absolute";
+            vGap.style.left = xGap + "px";
+            vGap.style.top = topMargin + "px";
+            vGap.style.width = gapWidth + "px";
+            vGap.style.height =
+              totalBoxHeight - topMargin - bottomMargin + "px";
+            vGap.style.backgroundColor = insideColor;
+            insideElements.push(vGap);
+
+            xGap += gapWidth;
+          }
+
+          // Horizontal gaps (between rows)
+          yGap = topMargin;
+          for (let r = 0; r < rows - 1; r++) {
+            yGap += boxHeight;
+            const gapHeight = rowGaps[r];
+
+            const hGap = document.createElement("div");
+            hGap.style.position = "absolute";
+            hGap.style.left = leftMargin + "px";
+            hGap.style.top = yGap + "px";
+            hGap.style.width = totalBoxWidth - leftMargin - rightMargin + "px";
+            hGap.style.height = gapHeight + "px";
+            hGap.style.backgroundColor = insideColor;
+            insideElements.push(hGap);
+
+            yGap += gapHeight;
+          }
+
+          // Step 3: Draw boxes (on top)
+          for (const pos of boxPositions) {
+            const box = document.createElement("div");
+            box.style.position = "absolute";
+            box.style.left = pos.x + "px";
+            box.style.top = pos.y + "px";
+            box.style.width = boxWidth + "px";
+            box.style.height = boxHeight + "px";
+            box.style.backgroundColor = boxColor;
+            boxElements.push(box);
+          }
+
+          // Append elements to output grid in the correct order
+          // Outside rectangles (bottom layer)
+          outsideElements.forEach((el) => {
+            outputGrid.appendChild(el);
+          });
+
+          // Inside gaps (middle layer)
+          insideElements.forEach((el) => {
+            outputGrid.appendChild(el);
+          });
+
+          // Boxes (top layer)
+          boxElements.forEach((el) => {
+            outputGrid.appendChild(el);
+          });
+
+          // ***** Input Grid Construction *****
+          // Draw boxes in input grid
+          for (const pos of boxPositions) {
+            const box = document.createElement("div");
+            box.style.position = "absolute";
+            box.style.left = pos.x + "px";
+            box.style.top = pos.y + "px";
+            box.style.width = boxWidth + "px";
+            box.style.height = boxHeight + "px";
+            box.style.backgroundColor = boxColor;
+            inputGrid.appendChild(box);
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

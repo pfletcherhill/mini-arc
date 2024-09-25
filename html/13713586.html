@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>13713586</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      const main = document.querySelector("main");
+
+      // Pick a random number of pairs between 2 and 5
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+
+      // Pick a background color for the grids, black 60% of the time
+      let backgroundColor;
+      if (Math.random() < 0.6) {
+        backgroundColor = "#111111"; // black
+      } else {
+        const otherColors = colors.filter((color) => color !== "#111111");
+        backgroundColor =
+          otherColors[Math.floor(Math.random() * otherColors.length)];
+      }
+
+      // Pick a base color, excluding the background color
+      const availableColors = colors.filter(
+        (color) => color !== backgroundColor
+      );
+      const baseColor =
+        availableColors[Math.floor(Math.random() * availableColors.length)];
+
+      // Pick a baseline width between 1 and 3 pixels, same for all pairs
+      const baselineWidth = Math.floor(Math.random() * 3) + 1;
+
+      for (let i = 0; i < numPairs; i++) {
+        // Create the pair element
+        const pair = document.createElement("div");
+        pair.classList.add("pair");
+
+        // Create the input container
+        const inputContainer = document.createElement("div");
+        inputContainer.classList.add("container");
+
+        // Create the input grid
+        const inputGrid = document.createElement("div");
+        inputGrid.classList.add("grid");
+
+        // Assign an id to the input grid
+        inputGrid.id = `input-${i + 1}`;
+
+        // Append the input grid to the input container
+        inputContainer.appendChild(inputGrid);
+
+        // Create the output container
+        const outputContainer = document.createElement("div");
+        outputContainer.classList.add("container");
+
+        // Create the output grid
+        const outputGrid = document.createElement("div");
+        outputGrid.classList.add("grid");
+
+        // Assign an id to the output grid
+        outputGrid.id = `output-${i + 1}`;
+
+        // Append the output grid to the output container
+        outputContainer.appendChild(outputGrid);
+
+        // Append the containers to the pair
+        pair.appendChild(inputContainer);
+        pair.appendChild(outputContainer);
+
+        // Append the pair to the main element
+        main.appendChild(pair);
+
+        // Now, for each grid, we need to create the elements and draw the shapes
+
+        // Randomly pick grid width and height between 12 and 24 pixels
+        const gridWidth = Math.floor(Math.random() * 13) + 12;
+        const gridHeight = Math.floor(Math.random() * 13) + 12;
+
+        // Set grid dimensions
+        inputGrid.style.width = gridWidth + "px";
+        inputGrid.style.height = gridHeight + "px";
+        inputGrid.style.backgroundColor = backgroundColor;
+
+        outputGrid.style.width = gridWidth + "px";
+        outputGrid.style.height = gridHeight + "px";
+        outputGrid.style.backgroundColor = backgroundColor;
+
+        // Now, we need to pick a base side randomly
+        const sides = ["top", "bottom", "left", "right"];
+        const baseSide = sides[Math.floor(Math.random() * sides.length)];
+
+        // Draw the baseline along that edge, with the baselineWidth and baseColor
+        function createBaseline(grid) {
+          const baseline = document.createElement("div");
+          baseline.style.position = "absolute";
+          baseline.style.backgroundColor = baseColor;
+
+          if (baseSide === "top") {
+            baseline.style.top = "0px";
+            baseline.style.left = "0px";
+            baseline.style.width = gridWidth + "px";
+            baseline.style.height = baselineWidth + "px";
+          } else if (baseSide === "bottom") {
+            baseline.style.bottom = "0px";
+            baseline.style.left = "0px";
+            baseline.style.width = gridWidth + "px";
+            baseline.style.height = baselineWidth + "px";
+          } else if (baseSide === "left") {
+            baseline.style.top = "0px";
+            baseline.style.left = "0px";
+            baseline.style.width = baselineWidth + "px";
+            baseline.style.height = gridHeight + "px";
+          } else if (baseSide === "right") {
+            baseline.style.top = "0px";
+            baseline.style.right = "0px";
+            baseline.style.width = baselineWidth + "px";
+            baseline.style.height = gridHeight + "px";
+          }
+
+          grid.appendChild(baseline);
+        }
+
+        // Create baseline for input and output grids
+        createBaseline(inputGrid);
+        createBaseline(outputGrid);
+
+        // Now, we need to draw 2-5 lines parallel to the base edge, elsewhere in the grid
+        const numLines = Math.floor(Math.random() * 4) + 2;
+
+        const lines = [];
+
+        for (let j = 0; j < numLines; j++) {
+          let lineLength = Math.floor(Math.random() * 7) + 2;
+
+          let lineDiv;
+          let validPosition = false;
+          let maxAttempts = 100;
+          let attempts = 0;
+
+          while (!validPosition && attempts < maxAttempts) {
+            attempts++;
+
+            lineDiv = document.createElement("div");
+            lineDiv.style.position = "absolute";
+
+            const lineColor =
+              availableColors[
+                Math.floor(Math.random() * availableColors.length)
+              ];
+            lineDiv.style.backgroundColor = lineColor;
+
+            if (baseSide === "top" || baseSide === "bottom") {
+              // Lines are horizontal
+
+              let x = Math.floor(Math.random() * (gridWidth - lineLength + 1));
+              let y;
+
+              if (baseSide === "top") {
+                y =
+                  Math.floor(Math.random() * (gridHeight - baselineWidth - 1)) +
+                  baselineWidth +
+                  1;
+              } else {
+                y = Math.floor(
+                  Math.random() * (gridHeight - baselineWidth - 1)
+                );
+              }
+
+              // Check for overlap with existing lines
+              let overlaps = lines.some((line) => {
+                return (
+                  line.y === y &&
+                  ((x >= line.x && x < line.x + line.width) ||
+                    (x + lineLength > line.x &&
+                      x + lineLength <= line.x + line.width) ||
+                    (x <= line.x && x + lineLength >= line.x + line.width))
+                );
+              });
+
+              if (!overlaps) {
+                lineDiv.style.left = x + "px";
+                lineDiv.style.top = y + "px";
+                lineDiv.style.width = lineLength + "px";
+                lineDiv.style.height = "1px";
+                validPosition = true;
+
+                // Store line info
+                lines.push({
+                  x: x,
+                  y: y,
+                  width: lineLength,
+                  height: 1,
+                  color: lineColor,
+                });
+              }
+            } else {
+              // Lines are vertical
+
+              let y = Math.floor(Math.random() * (gridHeight - lineLength + 1));
+              let x;
+
+              if (baseSide === "left") {
+                x =
+                  Math.floor(Math.random() * (gridWidth - baselineWidth - 1)) +
+                  baselineWidth +
+                  1;
+              } else {
+                x = Math.floor(Math.random() * (gridWidth - baselineWidth - 1));
+              }
+
+              // Check for overlap with existing lines
+              let overlaps = lines.some((line) => {
+                return (
+                  line.x === x &&
+                  ((y >= line.y && y < line.y + line.height) ||
+                    (y + lineLength > line.y &&
+                      y + lineLength <= line.y + line.height) ||
+                    (y <= line.y && y + lineLength >= line.y + line.height))
+                );
+              });
+
+              if (!overlaps) {
+                lineDiv.style.left = x + "px";
+                lineDiv.style.top = y + "px";
+                lineDiv.style.width = "1px";
+                lineDiv.style.height = lineLength + "px";
+                validPosition = true;
+
+                // Store line info
+                lines.push({
+                  x: x,
+                  y: y,
+                  width: 1,
+                  height: lineLength,
+                  color: lineColor,
+                });
+              }
+            }
+          }
+
+          if (!validPosition) {
+            // Could not find a valid position for the line after maxAttempts
+            continue;
+          }
+
+          // Append the line to the input grid
+          inputGrid.appendChild(lineDiv);
+        }
+
+        // Now, for the output grid, we need to extend each line to the baseline, forming a rectangle
+
+        // We need to sort the lines from farthest away from the baseline to closest, so that rectangles that are shorter are drawn on top
+
+        lines.forEach((line) => {
+          if (baseSide === "top") {
+            line.distance = line.y - baselineWidth;
+          } else if (baseSide === "bottom") {
+            line.distance = gridHeight - baselineWidth - (line.y + line.height);
+          } else if (baseSide === "left") {
+            line.distance = line.x - baselineWidth;
+          } else if (baseSide === "right") {
+            line.distance = gridWidth - baselineWidth - (line.x + line.width);
+          }
+        });
+
+        // Sort lines from farthest to closest
+        lines.sort((a, b) => b.distance - a.distance);
+
+        // Now, for each line, draw the rectangle extending to the baseline
+        lines.forEach((line) => {
+          let rectDiv = document.createElement("div");
+          rectDiv.style.position = "absolute";
+          rectDiv.style.backgroundColor = line.color;
+
+          if (baseSide === "top") {
+            rectDiv.style.left = line.x + "px";
+            rectDiv.style.top = baselineWidth + "px";
+            rectDiv.style.width = line.width + "px";
+            rectDiv.style.height = line.y + line.height - baselineWidth + "px";
+          } else if (baseSide === "bottom") {
+            rectDiv.style.left = line.x + "px";
+            rectDiv.style.top = line.y + "px";
+            rectDiv.style.width = line.width + "px";
+            rectDiv.style.height = gridHeight - baselineWidth - line.y + "px";
+          } else if (baseSide === "left") {
+            rectDiv.style.left = baselineWidth + "px";
+            rectDiv.style.top = line.y + "px";
+            rectDiv.style.width = line.x + line.width - baselineWidth + "px";
+            rectDiv.style.height = line.height + "px";
+          } else if (baseSide === "right") {
+            rectDiv.style.left = line.x + "px";
+            rectDiv.style.top = line.y + "px";
+            rectDiv.style.width = gridWidth - baselineWidth - line.x + "px";
+            rectDiv.style.height = line.height + "px";
+          }
+
+          // Append the rectangle to the output grid
+          outputGrid.appendChild(rectDiv);
+        });
+      }
+    </script>
+  </body>
+</html>

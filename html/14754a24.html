@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>14754a24</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        display: grid;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be generated dynamically -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Proper shuffle function
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          let j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      // Pick a background color (black for 60% of puzzles)
+      const useBlackBackground = Math.random() < 0.6;
+      let backgroundColor;
+      if (useBlackBackground) {
+        backgroundColor = "#111111";
+      } else {
+        const colorsExcludingBlack = colors.filter(
+          (color) => color !== "#111111"
+        );
+        backgroundColor =
+          colorsExcludingBlack[
+            Math.floor(Math.random() * colorsExcludingBlack.length)
+          ];
+      }
+
+      // Exclude background color from colors
+      const availableColors = colors.filter(
+        (color) => color !== backgroundColor
+      );
+
+      // Shuffle availableColors
+      shuffle(availableColors);
+
+      // Pick noiseColor, shapeColor, highlightColor
+      const noiseColor = availableColors[0];
+      const shapeColor = availableColors[1];
+      const highlightColor = availableColors[2];
+
+      const shapeWidth = 3;
+      const shapeHeight = 3;
+
+      const shapes = [
+        [
+          [false, true, false],
+          [true, true, true],
+          [false, true, false],
+        ],
+        [
+          [false, true, false],
+          [true, false, true],
+          [false, true, false],
+        ],
+        [
+          [true, true, true],
+          [true, false, true],
+          [true, true, true],
+        ],
+        [
+          [true, true, true],
+          [false, true, false],
+          [true, true, true],
+        ],
+      ];
+
+      const shapePattern = shapes[Math.floor(Math.random() * 4)];
+
+      // Pick gridWidth and gridHeight (12 to 24)
+      const gridWidth = Math.floor(Math.random() * (24 - 12 + 1)) + 12;
+      const gridHeight = Math.floor(Math.random() * (24 - 12 + 1)) + 12;
+
+      // Pick random number of pairs (2 to 5)
+      const nPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+      const cellSize = 1; // in pixels
+
+      const mainElement = document.querySelector("main");
+
+      for (let i = 1; i <= nPairs; i++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        const inputGridDiv = document.createElement("div");
+        inputGridDiv.id = "input-" + i;
+        inputGridDiv.className = "grid";
+        inputContainer.appendChild(inputGridDiv);
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        const outputGridDiv = document.createElement("div");
+        outputGridDiv.id = "output-" + i;
+        outputGridDiv.className = "grid";
+        outputContainer.appendChild(outputGridDiv);
+
+        // Append containers to pairDiv
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pairDiv to mainElement
+        mainElement.appendChild(pairDiv);
+
+        // Set background color
+        inputGridDiv.style.backgroundColor = backgroundColor;
+        outputGridDiv.style.backgroundColor = backgroundColor;
+
+        // Set grid template with cell size in px
+        inputGridDiv.style.gridTemplateColumns = `repeat(${gridWidth}, ${cellSize}px)`;
+        inputGridDiv.style.gridTemplateRows = `repeat(${gridHeight}, ${cellSize}px)`;
+        outputGridDiv.style.gridTemplateColumns = `repeat(${gridWidth}, ${cellSize}px)`;
+        outputGridDiv.style.gridTemplateRows = `repeat(${gridHeight}, ${cellSize}px)`;
+
+        // Set grid width and height in px
+        inputGridDiv.style.width = gridWidth * cellSize + "px";
+        inputGridDiv.style.height = gridHeight * cellSize + "px";
+        outputGridDiv.style.width = gridWidth * cellSize + "px";
+        outputGridDiv.style.height = gridHeight * cellSize + "px";
+
+        // Generate outputGrid
+        var outputGrid = [];
+        for (var y = 0; y < gridHeight; y++) {
+          outputGrid[y] = [];
+          for (var x = 0; x < gridWidth; x++) {
+            outputGrid[y][x] = Math.random() < 0.5 ? noiseColor : null;
+          }
+        }
+
+        // Add shapes to outputGrid
+        const numberOfShapes = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+        for (let s = 0; s < numberOfShapes; s++) {
+          let placed = false;
+          let attempts = 0;
+          while (!placed && attempts < 100) {
+            attempts++;
+            const x0 = Math.floor(Math.random() * (gridWidth - shapeWidth + 1));
+            const y0 = Math.floor(
+              Math.random() * (gridHeight - shapeHeight + 1)
+            );
+            let canPlace = true;
+            for (let y = 0; y < shapeHeight; y++) {
+              for (let x = 0; x < shapeWidth; x++) {
+                if (shapePattern[y][x]) {
+                  const gridColor = outputGrid[y0 + y][x0 + x];
+                  if (
+                    gridColor === shapeColor ||
+                    gridColor === highlightColor
+                  ) {
+                    canPlace = false;
+                    break;
+                  }
+                }
+              }
+              if (!canPlace) break;
+            }
+            if (canPlace) {
+              // Place the shape
+              for (let y = 0; y < shapeHeight; y++) {
+                for (let x = 0; x < shapeWidth; x++) {
+                  if (shapePattern[y][x]) {
+                    outputGrid[y0 + y][x0 + x] = shapeColor;
+                  }
+                }
+              }
+              // Collect positions of shape pixels
+              let shapePositions = [];
+              for (let y = 0; y < shapeHeight; y++) {
+                for (let x = 0; x < shapeWidth; x++) {
+                  if (shapePattern[y][x]) {
+                    shapePositions.push({ x: x0 + x, y: y0 + y });
+                  }
+                }
+              }
+              // Shuffle shapePositions
+              shuffle(shapePositions);
+              // Assign at least one pixel to shapeColor and one to highlightColor
+              outputGrid[shapePositions[0].y][shapePositions[0].x] = shapeColor;
+              if (shapePositions.length > 1) {
+                outputGrid[shapePositions[1].y][shapePositions[1].x] =
+                  highlightColor;
+              }
+              // For the rest, randomly assign shapeColor or highlightColor
+              for (let idx = 2; idx < shapePositions.length; idx++) {
+                const pos = shapePositions[idx];
+                outputGrid[pos.y][pos.x] =
+                  Math.random() < 0.3 ? shapeColor : highlightColor;
+              }
+              placed = true;
+            }
+          }
+        }
+
+        // Generate inputGrid by copying outputGrid
+        var inputGrid = [];
+        for (var y = 0; y < gridHeight; y++) {
+          inputGrid[y] = [];
+          for (var x = 0; x < gridWidth; x++) {
+            inputGrid[y][x] = outputGrid[y][x];
+          }
+        }
+
+        // Modify inputGrid: replace shapeColor pixels with noiseColor
+        for (var y = 0; y < gridHeight; y++) {
+          for (var x = 0; x < gridWidth; x++) {
+            if (inputGrid[y][x] === shapeColor) {
+              inputGrid[y][x] = noiseColor;
+            }
+          }
+        }
+
+        // Render the grids
+        // Input grid
+        for (var y = 0; y < gridHeight; y++) {
+          for (var x = 0; x < gridWidth; x++) {
+            var pixelDiv = document.createElement("div");
+            if (inputGrid[y][x]) {
+              pixelDiv.style.backgroundColor = inputGrid[y][x];
+            } else {
+              pixelDiv.style.backgroundColor = "transparent";
+            }
+            inputGridDiv.appendChild(pixelDiv);
+          }
+        }
+        // Output grid
+        for (var y = 0; y < gridHeight; y++) {
+          for (var x = 0; x < gridWidth; x++) {
+            var pixelDivOut = document.createElement("div");
+            if (outputGrid[y][x]) {
+              pixelDivOut.style.backgroundColor = outputGrid[y][x];
+            } else {
+              pixelDivOut.style.backgroundColor = "transparent";
+            }
+            outputGridDiv.appendChild(pixelDivOut);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

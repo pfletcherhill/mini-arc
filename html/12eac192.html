@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>12eac192</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+        display: grid;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Pick background color (black for 60% of puzzles)
+      let backgroundColor;
+      if (Math.random() < 0.6) {
+        backgroundColor = "#111111"; // black
+      } else {
+        const otherColors = colors.filter((color) => color !== "#111111");
+        backgroundColor =
+          otherColors[Math.floor(Math.random() * otherColors.length)];
+      }
+
+      // Pick fill color (any color except background color)
+      const availableColors = colors.filter(
+        (color) => color !== backgroundColor
+      );
+      const fillColor =
+        availableColors[Math.floor(Math.random() * availableColors.length)];
+
+      // Pick cutoff number between 2 and 4
+      const cutoff = Math.floor(Math.random() * 3) + 2; // 2-4
+
+      // Pick random number of pairs between 2 and 5
+      const numPairs = Math.floor(Math.random() * 4) + 2; // 2-5
+
+      // Reference to main element
+      const main = document.querySelector("main");
+
+      // For each pair
+      for (let pairIndex = 1; pairIndex <= numPairs; pairIndex++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+
+        const inputGrid = document.createElement("div");
+        inputGrid.id = `input-${pairIndex}`;
+        inputGrid.className = "grid";
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+
+        const outputGrid = document.createElement("div");
+        outputGrid.id = `output-${pairIndex}`;
+        outputGrid.className = "grid";
+
+        // Append grids to containers
+        inputContainer.appendChild(inputGrid);
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        main.appendChild(pairDiv);
+
+        // Generate random grid sizes (rows and cols) between 3 and 20
+        const rows = Math.floor(Math.random() * 18) + 3; // 3-20
+        const cols = Math.floor(Math.random() * 18) + 3; // 3-20
+
+        // Calculate cell size
+        const cellWidth = Math.floor(30 / cols);
+        const cellHeight = Math.floor(30 / rows);
+        const cellSize = 1;
+
+        // Set grid styles
+        inputGrid.style.display = "grid";
+        inputGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+        inputGrid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+        inputGrid.style.width = `${cols}px`;
+        inputGrid.style.height = `${rows}px`;
+
+        outputGrid.style.display = "grid";
+        outputGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+        outputGrid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+        outputGrid.style.width = `${cols}px`;
+        outputGrid.style.height = `${rows}px`;
+
+        // Generate grid data
+        // Pick 2-4 colors from availableColors (excluding background and fill color)
+        const numColors = Math.floor(Math.random() * 3) + 2; // 2-4
+        const otherColors = availableColors.filter(
+          (color) => color !== fillColor
+        );
+        const shuffledColors = otherColors.sort(() => 0.5 - Math.random());
+        const selectedColors = shuffledColors.slice(0, numColors);
+
+        // Initialize grid data arrays
+        const inputGridData = [];
+        const outputGridData = [];
+
+        // Fill the grid
+        for (let row = 0; row < rows; row++) {
+          inputGridData[row] = [];
+          outputGridData[row] = [];
+          for (let col = 0; col < cols; col++) {
+            // Decide whether to assign a color or make it background
+            const isColored = Math.random() < 0.7; // 70% chance to have color
+            let color = null;
+            if (isColored) {
+              // Assign a random color from selectedColors
+              color =
+                selectedColors[
+                  Math.floor(Math.random() * selectedColors.length)
+                ];
+            }
+            inputGridData[row][col] = color;
+            // Initially, output grid data is same as input
+            outputGridData[row][col] = color;
+          }
+        }
+
+        // Process the grid for output
+        // For each color, find connected components
+        const visited = [];
+        for (let row = 0; row < rows; row++) {
+          visited[row] = [];
+          for (let col = 0; col < cols; col++) {
+            visited[row][col] = false;
+          }
+        }
+
+        function bfs(row, col, color) {
+          const queue = [];
+          queue.push([row, col]);
+          visited[row][col] = true;
+          let size = 1;
+          const positions = [[row, col]];
+          while (queue.length > 0) {
+            const [r, c] = queue.shift();
+            // Check neighbors (up, down, left, right)
+            const directions = [
+              [-1, 0],
+              [1, 0],
+              [0, -1],
+              [0, 1],
+            ];
+            for (const [dr, dc] of directions) {
+              const nr = r + dr;
+              const nc = c + dc;
+              if (
+                nr >= 0 &&
+                nr < rows &&
+                nc >= 0 &&
+                nc < cols &&
+                !visited[nr][nc] &&
+                inputGridData[nr][nc] === color
+              ) {
+                visited[nr][nc] = true;
+                queue.push([nr, nc]);
+                positions.push([nr, nc]);
+                size++;
+              }
+            }
+          }
+          return { size, positions };
+        }
+
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            if (!visited[row][col] && inputGridData[row][col]) {
+              const color = inputGridData[row][col];
+              const component = bfs(row, col, color);
+              if (component.size < cutoff) {
+                // Re-color these pixels to fillColor
+                for (const [r, c] of component.positions) {
+                  outputGridData[r][c] = fillColor;
+                }
+              }
+            }
+          }
+        }
+
+        // Now, create the input and output grid elements
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            // Input grid cell
+            const inputCell = document.createElement("div");
+            inputCell.style.width = `${cellSize}px`;
+            inputCell.style.height = `${cellSize}px`;
+            inputCell.style.backgroundColor =
+              inputGridData[row][col] || backgroundColor;
+            inputGrid.appendChild(inputCell);
+
+            // Output grid cell
+            const outputCell = document.createElement("div");
+            outputCell.style.width = `${cellSize}px`;
+            outputCell.style.height = `${cellSize}px`;
+            outputCell.style.backgroundColor =
+              outputGridData[row][col] || backgroundColor;
+            outputGrid.appendChild(outputCell);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

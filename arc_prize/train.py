@@ -112,8 +112,10 @@ def train_arc_transformer(
         dataset_params,
     )
 
+    dataset_dir_names = ", ".join(train_params.dataset_dir)
+
     print(
-        f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items"
+        f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items: {dataset_dir_names}"
     )
     print(f"Using batch size of {train_params.batch_size}")
 

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>1d398264</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getRandomColor() {
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      const backgroundColor =
+        Math.random() < 0.6 ? "#111111" : getRandomColor();
+
+      function createGrid(size, isOutput = false, inputSquare = null) {
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        grid.style.width = `${size}px`;
+        grid.style.height = `${size}px`;
+        grid.style.backgroundColor = backgroundColor;
+
+        const squareSize = 3;
+        let squareX, squareY, squareColors;
+
+        if (isOutput && inputSquare) {
+          squareX = inputSquare.x;
+          squareY = inputSquare.y;
+          squareColors = inputSquare.colors;
+        } else {
+          squareX = getRandomInt(0, size - squareSize);
+          squareY = getRandomInt(0, size - squareSize);
+          squareColors = [];
+        }
+
+        for (let y = 0; y < squareSize; y++) {
+          for (let x = 0; x < squareSize; x++) {
+            let color;
+            if (isOutput) {
+              color = squareColors[y * squareSize + x];
+            } else {
+              do {
+                color = getRandomColor();
+              } while (color === grid.style.backgroundColor);
+              squareColors.push(color);
+            }
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.left = `${squareX + x}px`;
+            pixel.style.top = `${squareY + y}px`;
+            pixel.style.width = "1px";
+            pixel.style.height = "1px";
+            pixel.style.backgroundColor = color;
+            grid.appendChild(pixel);
+          }
+        }
+
+        if (isOutput) {
+          // Draw lines from square borders to grid edges
+          const directions = [
+            [-1, -1],
+            [0, -1],
+            [1, -1],
+            [-1, 0],
+            [1, 0],
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+          ];
+
+          const borderColors = [
+            squareColors[0],
+            squareColors[1],
+            squareColors[2],
+            squareColors[3],
+            squareColors[5],
+            squareColors[6],
+            squareColors[7],
+            squareColors[8],
+          ];
+
+          // [x, y]
+          const borderPositions = [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+            [0, 1],
+            [2, 1],
+            [0, 2],
+            [1, 2],
+            [2, 2],
+          ];
+
+          for (let i = 0; i < directions.length; i++) {
+            let [dx, dy] = directions[i];
+            let [xPos, yPos] = borderPositions[i];
+            let x = squareX + xPos;
+            let y = squareY + yPos;
+            const color = borderColors[i];
+
+            while (x >= 0 && x < size && y >= 0 && y < size) {
+              if (
+                x < squareX ||
+                x >= squareX + squareSize ||
+                y < squareY ||
+                y >= squareY + squareSize
+              ) {
+                const pixel = document.createElement("div");
+                pixel.style.position = "absolute";
+                pixel.style.left = `${x}px`;
+                pixel.style.top = `${y}px`;
+                pixel.style.width = "1px";
+                pixel.style.height = "1px";
+                pixel.style.backgroundColor = color;
+                grid.appendChild(pixel);
+              }
+              x += dx;
+              y += dy;
+            }
+          }
+        }
+
+        return isOutput
+          ? grid
+          : { grid, square: { x: squareX, y: squareY, colors: squareColors } };
+      }
+
+      function createPair() {
+        const pair = document.createElement("div");
+        pair.className = "pair";
+
+        const size = getRandomInt(10, 22);
+
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        const { grid: inputGrid, square } = createGrid(size);
+        inputContainer.appendChild(inputGrid);
+
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        const outputGrid = createGrid(size, true, square);
+        outputContainer.appendChild(outputGrid);
+
+        pair.appendChild(inputContainer);
+        pair.appendChild(outputContainer);
+
+        return pair;
+      }
+
+      function initializePuzzle() {
+        const container = document.getElementById("puzzle-container");
+        const numPairs = getRandomInt(2, 5);
+
+        for (let i = 0; i < numPairs; i++) {
+          container.appendChild(createPair());
+        }
+      }
+
+      // Initialize the puzzle when the page loads
+      window.onload = initializePuzzle;
+    </script>
+  </body>
+</html>

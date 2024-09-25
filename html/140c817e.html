@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>140c817e</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Remove black from colors if needed
+      const nonBlackColors = colors.filter((color) => color !== "#111111");
+
+      // Pick centerColor and squareColor (any colors)
+      const centerColor = colors[Math.floor(Math.random() * colors.length)];
+      let squareColor = colors[Math.floor(Math.random() * colors.length)];
+      // Ensure squareColor is different from centerColor
+      while (squareColor === centerColor) {
+        squareColor = colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      // Pick squareRadius between 1 and 3
+      const squareRadius = Math.floor(Math.random() * 3) + 1; // 1 to 3
+
+      // Randomly determine number of pairs between 2 and 5
+      const numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+      const main = document.querySelector("main");
+
+      for (let pairIndex = 0; pairIndex < numPairs; pairIndex++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // For this pair, pick grid size between 9 and 20 pixels, width and height separately
+        const gridWidth = Math.floor(Math.random() * 12) + 9; // 9 to 20
+        const gridHeight = Math.floor(Math.random() * 12) + 9; // 9 to 20
+
+        // For this pair, pick a background color (grids in a pair have the same background color)
+        let pairBackgroundColor;
+        if (Math.random() < 0.6) {
+          pairBackgroundColor = "#111111"; // black
+        } else {
+          pairBackgroundColor =
+            colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // For this pair, pick the color of the squares in the input grid
+        // Should be any color except the background color, centerColor, or squareColor
+        let inputSquareColor =
+          colors[Math.floor(Math.random() * colors.length)];
+        while (
+          inputSquareColor === pairBackgroundColor ||
+          inputSquareColor === centerColor ||
+          inputSquareColor === squareColor
+        ) {
+          inputSquareColor = colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Create input container and grid
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        const inputGrid = document.createElement("div");
+        inputGrid.className = "grid";
+        inputGrid.style.width = gridWidth + "px";
+        inputGrid.style.height = gridHeight + "px";
+        inputGrid.style.backgroundColor = pairBackgroundColor;
+        inputGrid.style.position = "relative";
+
+        // Create output container and grid
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        const outputGrid = document.createElement("div");
+        outputGrid.className = "grid";
+        outputGrid.style.width = gridWidth + "px";
+        outputGrid.style.height = gridHeight + "px";
+        outputGrid.style.backgroundColor = pairBackgroundColor;
+        outputGrid.style.position = "relative";
+
+        // Add 2-5 random 1px squares to input grid
+        const numSquares = Math.floor(Math.random() * 4) + 2; // 2 to 5
+        const occupiedPositions = [];
+
+        for (let i = 0; i < numSquares; i++) {
+          let x, y;
+          let positionValid = false;
+          while (!positionValid) {
+            x = Math.floor(Math.random() * gridWidth);
+            y = Math.floor(Math.random() * gridHeight);
+            positionValid = true;
+            // Check that the position does not touch or overlap any existing square
+            for (const pos of occupiedPositions) {
+              if (Math.abs(pos.x - x) <= 1 && Math.abs(pos.y - y) <= 1) {
+                positionValid = false;
+                break;
+              }
+            }
+            if (positionValid) {
+              occupiedPositions.push({ x, y });
+            }
+          }
+          // Add the square to the input grid
+          const squareDiv = document.createElement("div");
+          squareDiv.style.position = "absolute";
+          squareDiv.style.width = "1px";
+          squareDiv.style.height = "1px";
+          squareDiv.style.left = x + "px";
+          squareDiv.style.top = y + "px";
+          squareDiv.style.backgroundColor = inputSquareColor;
+          inputGrid.appendChild(squareDiv);
+        }
+
+        // For output grid, perform steps 1-3
+
+        for (const pos of occupiedPositions) {
+          // Step 1: Add square to output grid using squareColor
+          const squareSize = 2 * squareRadius + 1;
+          const squareDiv = document.createElement("div");
+          squareDiv.style.position = "absolute";
+          squareDiv.style.width = squareSize + "px";
+          squareDiv.style.height = squareSize + "px";
+          squareDiv.style.left = pos.x - squareRadius + "px";
+          squareDiv.style.top = pos.y - squareRadius + "px";
+          squareDiv.style.backgroundColor = squareColor;
+          outputGrid.appendChild(squareDiv);
+
+          // Step 2: Draw vertical and horizontal lines on output grid in color of the square in input grid
+          // Vertical line
+          const vLine = document.createElement("div");
+          vLine.style.position = "absolute";
+          vLine.style.width = "1px";
+          vLine.style.height = gridHeight + "px";
+          vLine.style.left = pos.x + "px";
+          vLine.style.top = "0px";
+          vLine.style.backgroundColor = inputSquareColor;
+          vLine.style.zIndex = 1; // Above the square
+          outputGrid.appendChild(vLine);
+
+          // Horizontal line
+          const hLine = document.createElement("div");
+          hLine.style.position = "absolute";
+          hLine.style.width = gridWidth + "px";
+          hLine.style.height = "1px";
+          hLine.style.left = "0px";
+          hLine.style.top = pos.y + "px";
+          hLine.style.backgroundColor = inputSquareColor;
+          hLine.style.zIndex = 1; // Above the square
+          outputGrid.appendChild(hLine);
+
+          // Step 3: Add a 1px square in the same position as in input grid with centerColor
+          const centerDiv = document.createElement("div");
+          centerDiv.style.position = "absolute";
+          centerDiv.style.width = "1px";
+          centerDiv.style.height = "1px";
+          centerDiv.style.left = pos.x + "px";
+          centerDiv.style.top = pos.y + "px";
+          centerDiv.style.backgroundColor = centerColor;
+          centerDiv.style.zIndex = 2; // On top
+          outputGrid.appendChild(centerDiv);
+        }
+
+        // Append grids to containers
+        inputContainer.appendChild(inputGrid);
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        main.appendChild(pairDiv);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>15696249</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+      .pixel {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomColor(excludeColors = []) {
+        let availableColors = colors.filter(
+          (color) => !excludeColors.includes(color)
+        );
+        return availableColors[
+          Math.floor(Math.random() * availableColors.length)
+        ];
+      }
+
+      function createInputGrid(container, pattern, width, height) {
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const pixel = document.createElement("div");
+            pixel.className = "pixel";
+            pixel.style.left = `${x}px`;
+            pixel.style.top = `${y}px`;
+            pixel.style.backgroundColor = pattern[y][x];
+            container.appendChild(pixel);
+          }
+        }
+      }
+
+      function createOutputGrid(
+        container,
+        pattern,
+        backgroundColor,
+        highlightAxis,
+        highlightIndices,
+        inputWidth,
+        inputHeight
+      ) {
+        const outputWidth = inputWidth * inputWidth;
+        const outputHeight = inputHeight * inputHeight;
+
+        for (let y = 0; y < outputHeight; y++) {
+          for (let x = 0; x < outputWidth; x++) {
+            const pixel = document.createElement("div");
+            pixel.className = "pixel";
+            pixel.style.left = `${x}px`;
+            pixel.style.top = `${y}px`;
+
+            if (
+              (highlightAxis === "row" &&
+                highlightIndices.includes(Math.floor(y / inputHeight))) ||
+              (highlightAxis === "column" &&
+                highlightIndices.includes(Math.floor(x / inputWidth)))
+            ) {
+              pixel.style.backgroundColor =
+                pattern[y % inputHeight][x % inputWidth];
+            } else {
+              pixel.style.backgroundColor = backgroundColor;
+            }
+
+            container.appendChild(pixel);
+          }
+        }
+      }
+
+      function generatePattern(
+        width,
+        height,
+        primaryColor,
+        secondaryColors,
+        highlightAxis,
+        highlightIndices
+      ) {
+        const pattern = Array(height)
+          .fill()
+          .map(() => Array(width).fill(null));
+
+        // Fill highlighted rows/columns with primary color
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (
+              (highlightAxis === "row" && highlightIndices.includes(y)) ||
+              (highlightAxis === "column" && highlightIndices.includes(x))
+            ) {
+              pattern[y][x] = primaryColor;
+            }
+          }
+        }
+
+        // Fill remaining cells with secondary colors
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (pattern[y][x] === null) {
+              // Avoid using the same color in the entire row or column
+              const usedColors = new Set();
+              if (highlightAxis === "row") {
+                for (let i = 0; i < width; i++) {
+                  if (pattern[y][i] !== null) usedColors.add(pattern[y][i]);
+                }
+              } else {
+                for (let i = 0; i < height; i++) {
+                  if (pattern[i][x] !== null) usedColors.add(pattern[i][x]);
+                }
+              }
+              const availableColors = secondaryColors.filter(
+                (color) => !usedColors.has(color)
+              );
+              pattern[y][x] =
+                availableColors[
+                  Math.floor(Math.random() * availableColors.length)
+                ];
+            }
+          }
+        }
+
+        return pattern;
+      }
+
+      function generatePuzzle() {
+        const container = document.getElementById("puzzle-container");
+        container.innerHTML = ""; // Clear existing content
+
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random number between 2 and 5
+        const backgroundColor =
+          Math.random() < 0.6 ? "#111111" : getRandomColor();
+
+        for (let i = 1; i <= numPairs; i++) {
+          const pair = document.createElement("div");
+          pair.className = "pair";
+
+          // Determine input grid size
+          let inputWidth, inputHeight;
+          const sizeRoll = Math.random();
+          if (sizeRoll < 0.05) {
+            // 5% chance for 5x5
+            inputWidth = inputHeight = 5;
+          } else if (sizeRoll < 0.45) {
+            // 40% chance for 4x4
+            inputWidth = inputHeight = 4;
+          } else {
+            // 55% chance for 3x3
+            inputWidth = inputHeight = 3;
+          }
+
+          // Occasionally make non-square grids (including 2x3 and 3x2)
+          if (Math.random() < 0.2) {
+            if (Math.random() < 0.5) {
+              inputWidth = Math.max(2, inputWidth - 1);
+            } else {
+              inputHeight = Math.max(2, inputHeight - 1);
+            }
+          }
+
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.id = `input-${i}`;
+          inputGrid.className = "grid";
+          inputGrid.style.width = `${inputWidth}px`;
+          inputGrid.style.height = `${inputHeight}px`;
+          inputContainer.appendChild(inputGrid);
+
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.id = `output-${i}`;
+          outputGrid.className = "grid";
+          outputGrid.style.width = `${inputWidth * inputWidth}px`;
+          outputGrid.style.height = `${inputHeight * inputHeight}px`;
+          outputContainer.appendChild(outputGrid);
+
+          pair.appendChild(inputContainer);
+          pair.appendChild(outputContainer);
+          container.appendChild(pair);
+
+          // Generate colors for this pair
+          const primaryColor = getRandomColor([backgroundColor]);
+          const numSecondaryColors = Math.min(
+            3,
+            Math.max(inputWidth, inputHeight) - 1
+          );
+          const secondaryColors = [];
+          for (let j = 0; j < numSecondaryColors; j++) {
+            secondaryColors.push(
+              getRandomColor([
+                backgroundColor,
+                primaryColor,
+                ...secondaryColors,
+              ])
+            );
+          }
+
+          // Generate input pattern
+          const highlightAxis = Math.random() < 0.5 ? "row" : "column";
+          const numHighlights = Math.random() < 0.2 ? 2 : 1; // 20% chance for two highlights
+          const highlightIndices = [];
+          while (highlightIndices.length < numHighlights) {
+            const index = Math.floor(
+              Math.random() *
+                (highlightAxis === "row" ? inputHeight : inputWidth)
+            );
+            if (!highlightIndices.includes(index)) {
+              highlightIndices.push(index);
+            }
+          }
+
+          const inputPattern = generatePattern(
+            inputWidth,
+            inputHeight,
+            primaryColor,
+            secondaryColors,
+            highlightAxis,
+            highlightIndices
+          );
+
+          // Create input and output grids
+          createInputGrid(inputGrid, inputPattern, inputWidth, inputHeight);
+          createOutputGrid(
+            outputGrid,
+            inputPattern,
+            backgroundColor,
+            highlightAxis,
+            highlightIndices,
+            inputWidth,
+            inputHeight
+          );
+
+          // Set background color
+          inputGrid.style.backgroundColor = backgroundColor;
+          outputGrid.style.backgroundColor = backgroundColor;
+        }
+      }
+
+      // Generate puzzle on page load
+      window.onload = generatePuzzle;
+    </script>
+  </body>
+</html>

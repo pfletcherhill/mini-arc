@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>12997ef3</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        /* No margin or padding */
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be dynamically inserted here -->
+    </main>
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      window.onload = function () {
+        // Pick a random number of pairs between 2 and 5
+        const numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+        // Get the main element
+        const main = document.querySelector("main");
+
+        // Clear any existing pairs
+        main.innerHTML = "";
+
+        // Pick background color (black 60% of the time)
+        const bgColor =
+          Math.random() < 0.6
+            ? "#111111"
+            : colors[Math.floor(Math.random() * colors.length)];
+
+        // Remove bgColor from colors array for future selections
+        const availableColors = colors.filter((color) => color !== bgColor);
+
+        // Pick a shape color from availableColors
+        const shapeColor =
+          availableColors[Math.floor(Math.random() * availableColors.length)];
+
+        // Pick shape size between 2x2 and 5x5 pixels (width and height)
+        const shapeWidth = Math.floor(Math.random() * 4) + 2; // 2 to 5
+        const shapeHeight = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+        // Puzzle-wide parameter: squareGap between 0 and 2 pixels
+        const squareGap = Math.floor(Math.random() * 3); // 0 to 2
+
+        // Now, for each pair
+        for (let i = 1; i <= numPairs; i++) {
+          // Create the pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create the input container
+          const inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          const inputGrid = document.createElement("div");
+          inputGrid.id = "input-" + i;
+          inputGrid.className = "grid";
+          inputContainer.appendChild(inputGrid);
+
+          // Create the output container
+          const outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          const outputGrid = document.createElement("div");
+          outputGrid.id = "output-" + i;
+          outputGrid.className = "grid";
+          outputContainer.appendChild(outputGrid);
+
+          // Append to pairDiv
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pairDiv to main
+          main.appendChild(pairDiv);
+
+          // Create the input grid
+          const inputGridWidth = Math.floor(Math.random() * 12) + 9; // 9 to 20
+          const inputGridHeight = Math.floor(Math.random() * 12) + 9; // 9 to 20
+
+          // Define cell size to scale up visibility
+          const cellSize = 1;
+
+          // Create the input grid
+          let gridData = createGrid(
+            inputGrid,
+            inputGridWidth,
+            inputGridHeight,
+            bgColor,
+            shapeColor,
+            shapeWidth,
+            shapeHeight,
+            availableColors,
+            cellSize,
+            squareGap
+          );
+
+          // Create the output grid using gridData
+          createOutputGrid(
+            outputGrid,
+            gridData,
+            bgColor,
+            shapeColor,
+            shapeWidth,
+            shapeHeight,
+            cellSize
+          );
+        }
+
+        function createGrid(
+          inputGridElement,
+          inputGridWidth,
+          inputGridHeight,
+          bgColor,
+          shapeColor,
+          shapeWidth,
+          shapeHeight,
+          availableColors,
+          cellSize,
+          squareGap
+        ) {
+          // Set inputGridElement style to use CSS grid
+          inputGridElement.style.gridTemplateColumns = `repeat(${inputGridWidth}, ${cellSize}px)`;
+          inputGridElement.style.gridTemplateRows = `repeat(${inputGridHeight}, ${cellSize}px)`;
+          inputGridElement.style.width = inputGridWidth * cellSize + "px";
+          inputGridElement.style.height = inputGridHeight * cellSize + "px";
+          inputGridElement.style.backgroundColor = bgColor;
+          inputGridElement.style.boxSizing = "border-box";
+
+          // Create a 2D array to represent the grid
+          let grid = [];
+          for (let y = 0; y < inputGridHeight; y++) {
+            grid[y] = [];
+            for (let x = 0; x < inputGridWidth; x++) {
+              grid[y][x] = bgColor;
+            }
+          }
+
+          // Place the shape in the grid at a random position
+          let shapePosX = Math.floor(
+            Math.random() * (inputGridWidth - shapeWidth + 1)
+          );
+          let shapePosY = Math.floor(
+            Math.random() * (inputGridHeight - shapeHeight + 1)
+          );
+
+          // Ensure the shape has at least one colored pixel on each edge
+          let shapePattern = [];
+          for (let y = 0; y < shapeHeight; y++) {
+            shapePattern[y] = [];
+            for (let x = 0; x < shapeWidth; x++) {
+              shapePattern[y][x] = false; // Initialize as not colored
+            }
+          }
+
+          // Set at least one colored pixel on each edge
+          // Top edge
+          let topEdgeX = Math.floor(Math.random() * shapeWidth);
+          shapePattern[0][topEdgeX] = true;
+
+          // Bottom edge
+          let bottomEdgeX = Math.floor(Math.random() * shapeWidth);
+          shapePattern[shapeHeight - 1][bottomEdgeX] = true;
+
+          // Left edge
+          let leftEdgeY = Math.floor(Math.random() * shapeHeight);
+          shapePattern[leftEdgeY][0] = true;
+
+          // Right edge
+          let rightEdgeY = Math.floor(Math.random() * shapeHeight);
+          shapePattern[rightEdgeY][shapeWidth - 1] = true;
+
+          // Fill the rest of the shape with random pixels
+          for (let y = 0; y < shapeHeight; y++) {
+            for (let x = 0; x < shapeWidth; x++) {
+              if (!shapePattern[y][x] && Math.random() < 0.5) {
+                shapePattern[y][x] = true;
+              }
+            }
+          }
+
+          // Apply the shape pattern to the grid
+          for (let y = 0; y < shapeHeight; y++) {
+            for (let x = 0; x < shapeWidth; x++) {
+              if (shapePattern[y][x]) {
+                grid[shapePosY + y][shapePosX + x] = shapeColor;
+              }
+            }
+          }
+
+          // Place 2-4 1px squares in a row (vertical or horizontal) with a gap
+          let numSquares = Math.floor(Math.random() * 3) + 2; // 2 to 4
+          let isVertical = Math.random() < 0.5;
+
+          // Calculate total length of squares and gaps
+          let totalLength = numSquares + (numSquares - 1) * squareGap;
+
+          // Find a position for the squares that doesn't overlap with the shape
+          let squaresPosX, squaresPosY;
+          let maxAttempts = 100;
+          let attempts = 0;
+          do {
+            attempts++;
+            if (attempts > maxAttempts) {
+              break;
+            }
+            if (isVertical) {
+              squaresPosX = Math.floor(Math.random() * inputGridWidth);
+              squaresPosY = Math.floor(
+                Math.random() * (inputGridHeight - totalLength + 1)
+              );
+            } else {
+              squaresPosX = Math.floor(
+                Math.random() * (inputGridWidth - totalLength + 1)
+              );
+              squaresPosY = Math.floor(Math.random() * inputGridHeight);
+            }
+            // Check for overlap with shape
+            let overlap = false;
+            for (let i = 0; i < numSquares; i++) {
+              let x = squaresPosX + (isVertical ? 0 : i * (1 + squareGap));
+              let y = squaresPosY + (isVertical ? i * (1 + squareGap) : 0);
+              if (
+                x >= shapePosX &&
+                x < shapePosX + shapeWidth &&
+                y >= shapePosY &&
+                y < shapePosY + shapeHeight
+              ) {
+                overlap = true;
+                break;
+              }
+            }
+            if (!overlap) break;
+          } while (true);
+
+          // Place the squares
+          let squaresColors = [];
+          for (let i = 0; i < numSquares; i++) {
+            let x = squaresPosX + (isVertical ? 0 : i * (1 + squareGap));
+            let y = squaresPosY + (isVertical ? i * (1 + squareGap) : 0);
+            let squareColor =
+              availableColors[
+                Math.floor(Math.random() * availableColors.length)
+              ];
+            squaresColors.push(squareColor);
+            grid[y][x] = squareColor;
+          }
+
+          // Render the grid
+          for (let y = 0; y < inputGridHeight; y++) {
+            for (let x = 0; x < inputGridWidth; x++) {
+              let cell = document.createElement("div");
+              cell.style.width = cellSize + "px";
+              cell.style.height = cellSize + "px";
+              cell.style.backgroundColor = grid[y][x];
+              inputGridElement.appendChild(cell);
+            }
+          }
+
+          // Return data needed to create the output grid
+          return {
+            isVertical: isVertical,
+            numSquares: numSquares,
+            squaresColors: squaresColors,
+            shapePattern: shapePattern,
+          };
+        }
+
+        function createOutputGrid(
+          outputGridElement,
+          gridData,
+          bgColor,
+          shapeColor,
+          shapeWidth,
+          shapeHeight,
+          cellSize
+        ) {
+          let { isVertical, numSquares, squaresColors, shapePattern } =
+            gridData;
+
+          let outputGridWidth, outputGridHeight;
+
+          if (isVertical) {
+            outputGridWidth = shapeWidth;
+            outputGridHeight = shapeHeight * numSquares;
+          } else {
+            outputGridWidth = shapeWidth * numSquares;
+            outputGridHeight = shapeHeight;
+          }
+
+          outputGridElement.style.gridTemplateColumns = `repeat(${outputGridWidth}, ${cellSize}px)`;
+          outputGridElement.style.gridTemplateRows = `repeat(${outputGridHeight}, ${cellSize}px)`;
+          outputGridElement.style.width = outputGridWidth * cellSize + "px";
+          outputGridElement.style.height = outputGridHeight * cellSize + "px";
+          outputGridElement.style.backgroundColor = bgColor;
+          outputGridElement.style.boxSizing = "border-box";
+
+          // Initialize output grid with background color
+          let grid = [];
+          for (let y = 0; y < outputGridHeight; y++) {
+            grid[y] = [];
+            for (let x = 0; x < outputGridWidth; x++) {
+              grid[y][x] = bgColor;
+            }
+          }
+
+          // For each of the squares in the row, repeat the shape using the color of that square
+          for (let i = 0; i < numSquares; i++) {
+            let color = squaresColors[i];
+            for (let y = 0; y < shapeHeight; y++) {
+              for (let x = 0; x < shapeWidth; x++) {
+                if (shapePattern[y][x]) {
+                  let gridX = isVertical ? x : x + i * shapeWidth;
+                  let gridY = isVertical ? y + i * shapeHeight : y;
+                  grid[gridY][gridX] = color;
+                }
+              }
+            }
+          }
+
+          // Render the grid
+          for (let y = 0; y < outputGridHeight; y++) {
+            for (let x = 0; x < outputGridWidth; x++) {
+              let cell = document.createElement("div");
+              cell.style.width = cellSize + "px";
+              cell.style.height = cellSize + "px";
+              cell.style.backgroundColor = grid[y][x];
+              outputGridElement.appendChild(cell);
+            }
+          }
+        }
+      };
+    </script>
+  </body>
+</html>

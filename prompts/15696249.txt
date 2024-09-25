@@ -1,0 +1,5 @@
+- Each input grid should be 3x3px
+- Each output grid should be 9x9px
+- For each input grid, pick a primary color and 2 secondary colors. They should all be distinct and different from the background color.
+- For each input grid, pick 1 vertical column or one horizontal row to highlight and fill that entire column or row with the primary color, so it should be 3 1px squares in the primary color. Then fill the remaining squares in the 3x3px grid with a random pattern using the secondary colors.
+- For each output grid, repeat the 3x3px pattern from the input grid based on which column or row was highlighted with the primary color in the input grid. If the top 1px row was highlighted, then will the top 9x3px row in the output grid by repeating the input grid three times horizontally. If the middle 1px column was highlighted in the input, then fill the middle 3x9px with the pattern repeated three times vertically in the output grid.

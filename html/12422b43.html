@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>12422b43</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      // Set the document title
+      document.title = "12422b43";
+
+      // Background color for the grids
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      let backgroundColor;
+      if (Math.random() < 0.6) {
+        backgroundColor = "#111111"; // black
+      } else {
+        // Pick a random color from colors array excluding black
+        const nonBlackColors = colors.filter((color) => color !== "#111111");
+        backgroundColor =
+          nonBlackColors[Math.floor(Math.random() * nonBlackColors.length)];
+      }
+
+      // Number of pairs between 2 and 5
+      const numPairs = Math.floor(Math.random() * 4) + 2; // Random integer between 2 and 5
+
+      // Starting side (top, bottom, left, right)
+      const sides = ["top", "bottom", "left", "right"];
+      const startingSide = sides[Math.floor(Math.random() * sides.length)];
+
+      // Marker position
+      let markerPositions;
+      if (startingSide === "top" || startingSide === "bottom") {
+        markerPositions = ["left", "right"];
+      } else {
+        // startingSide === "left" or "right"
+        markerPositions = ["top", "bottom"];
+      }
+      const markerPosition =
+        markerPositions[Math.floor(Math.random() * markerPositions.length)];
+
+      // Marker color (any color except background color)
+      const markerColors = colors.filter((color) => color !== backgroundColor);
+      const markerColor =
+        markerColors[Math.floor(Math.random() * markerColors.length)];
+
+      // Determine if marker shows in output grids (puzzle-wide parameter)
+      const showMarkerInOutput = Math.random() < 0.6; // true 60% of the time
+
+      // Get main element
+      const main = document.querySelector("main");
+      main.innerHTML = ""; // Clear existing content
+
+      for (let i = 1; i <= numPairs; i++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        const inputGridDiv = document.createElement("div");
+        inputGridDiv.id = `input-${i}`;
+        inputGridDiv.className = "grid";
+        inputContainer.appendChild(inputGridDiv);
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        const outputGridDiv = document.createElement("div");
+        outputGridDiv.id = `output-${i}`;
+        outputGridDiv.className = "grid";
+        outputContainer.appendChild(outputGridDiv);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        main.appendChild(pairDiv);
+
+        // Now generate the grids
+        generateGrids(inputGridDiv, outputGridDiv);
+      }
+
+      function generateGrids(inputGridDiv, outputGridDiv) {
+        // Random grid size between 5 and 20 pixels
+        const gridWidth = Math.floor(Math.random() * 16) + 5; // 5 to 20
+        const gridHeight = Math.floor(Math.random() * 16) + 5; // 5 to 20
+
+        // Set grid dimensions
+        inputGridDiv.style.width = `${gridWidth}px`;
+        inputGridDiv.style.height = `${gridHeight}px`;
+        outputGridDiv.style.width = `${gridWidth}px`;
+        outputGridDiv.style.height = `${gridHeight}px`;
+
+        // Use CSS grid to layout the cells
+        inputGridDiv.style.display = "grid";
+        inputGridDiv.style.gridTemplateColumns = `repeat(${gridWidth}, 1px)`;
+        inputGridDiv.style.gridTemplateRows = `repeat(${gridHeight}, 1px)`;
+        outputGridDiv.style.display = "grid";
+        outputGridDiv.style.gridTemplateColumns = `repeat(${gridWidth}, 1px)`;
+        outputGridDiv.style.gridTemplateRows = `repeat(${gridHeight}, 1px)`;
+
+        // Create 2D arrays to store the cell colors
+        const inputGrid = [];
+        const outputGrid = [];
+
+        for (let row = 0; row < gridHeight; row++) {
+          inputGrid[row] = [];
+          outputGrid[row] = [];
+          for (let col = 0; col < gridWidth; col++) {
+            inputGrid[row][col] = backgroundColor;
+            outputGrid[row][col] = backgroundColor;
+          }
+        }
+
+        // Determine available space for the column based on marker position
+        let minPosition, maxPosition, availableSpace;
+        let isHorizontal = startingSide === "left" || startingSide === "right";
+
+        if (!isHorizontal) {
+          // startingSide is 'top' or 'bottom', markerPosition is 'left' or 'right'
+          if (markerPosition === "left") {
+            minPosition = 1; // Leave 1 pixel on the left for marker
+            maxPosition = gridWidth - 1; // Last available column
+          } else {
+            // markerPosition === "right"
+            minPosition = 0;
+            maxPosition = gridWidth - 2; // Leave 1 pixel on the right for marker
+          }
+          availableSpace = maxPosition - minPosition + 1;
+        } else {
+          // startingSide is 'left' or 'right', markerPosition is 'top' or 'bottom'
+          if (markerPosition === "top") {
+            minPosition = 1; // Leave 1 pixel at the top for marker
+            maxPosition = gridHeight - 1; // Last available row
+          } else {
+            // markerPosition === "bottom"
+            minPosition = 0;
+            maxPosition = gridHeight - 2; // Leave 1 pixel at the bottom for marker
+          }
+          availableSpace = maxPosition - minPosition + 1;
+        }
+
+        // Adjust column width based on available space
+        let maxColumnWidth = Math.min(5, availableSpace);
+        let columnWidth = Math.floor(Math.random() * (maxColumnWidth - 1)) + 2; // 2 to maxColumnWidth
+
+        // Pick column start position
+        let maxStartPos = maxPosition - columnWidth + 1;
+        if (maxStartPos < minPosition) {
+          // Adjust column width if necessary
+          columnWidth = maxPosition - minPosition + 1;
+          maxStartPos = minPosition;
+        }
+        let columnStartPos =
+          Math.floor(Math.random() * (maxStartPos - minPosition + 1)) +
+          minPosition;
+
+        // Now, fill in 3-6 rows of the column with random colors and random bar widths/positions
+        const numRowsInColumn = Math.min(
+          isHorizontal ? gridWidth : gridHeight,
+          Math.floor(Math.random() * 4) + 3
+        ); // 3 to 6 rows
+
+        // Pick number of rows to repeat (1 to 6)
+        const numRowsToRepeat = Math.min(
+          numRowsInColumn,
+          Math.floor(Math.random() * 6) + 1
+        );
+
+        let markedRowsBars = [];
+
+        for (let index = 0; index < numRowsInColumn; index++) {
+          // Pick a random color (excluding background color and marker color)
+          const fillColors = colors.filter(
+            (color) => color !== backgroundColor && color !== markerColor
+          );
+          const fillColor =
+            fillColors[Math.floor(Math.random() * fillColors.length)];
+
+          // Random bar width (1px to columnWidth)
+          const barWidth = Math.floor(Math.random() * columnWidth) + 1; // 1 to columnWidth
+
+          // Random start position within the column
+          const maxStartOffset = columnWidth - barWidth;
+          const startOffset = Math.floor(Math.random() * (maxStartOffset + 1)); // 0 to maxStartOffset
+
+          if (!isHorizontal) {
+            // Vertical extension
+            let row;
+            if (startingSide === "top") {
+              row = index;
+            } else {
+              row = gridHeight - 1 - index;
+            }
+
+            const barStartCol = columnStartPos + startOffset;
+            const barEndCol = barStartCol + barWidth;
+
+            for (let col = barStartCol; col < barEndCol; col++) {
+              inputGrid[row][col] = fillColor;
+              outputGrid[row][col] = fillColor;
+            }
+
+            if (index < numRowsToRepeat) {
+              markedRowsBars.push({
+                fillColor: fillColor,
+                startOffset: startOffset,
+                barWidth: barWidth,
+              });
+            }
+          } else {
+            // Horizontal extension
+            let col;
+            if (startingSide === "left") {
+              col = index;
+            } else {
+              col = gridWidth - 1 - index;
+            }
+
+            const barStartRow = columnStartPos + startOffset;
+            const barEndRow = barStartRow + barWidth;
+
+            for (let row = barStartRow; row < barEndRow; row++) {
+              inputGrid[row][col] = fillColor;
+              outputGrid[row][col] = fillColor;
+            }
+
+            if (index < numRowsToRepeat) {
+              markedRowsBars.push({
+                fillColor: fillColor,
+                startOffset: startOffset,
+                barWidth: barWidth,
+              });
+            }
+          }
+        }
+
+        // Draw marker in both input and output grids (depending on puzzle parameter)
+        if (!isHorizontal) {
+          // Vertical grids
+          let markerColumn = markerPosition === "left" ? 0 : gridWidth - 1;
+          for (let i = 0; i < numRowsToRepeat; i++) {
+            let row;
+            if (startingSide === "top") {
+              row = i;
+            } else {
+              row = gridHeight - 1 - i;
+            }
+            inputGrid[row][markerColumn] = markerColor;
+            if (showMarkerInOutput) {
+              outputGrid[row][markerColumn] = markerColor;
+            }
+          }
+        } else {
+          // Horizontal grids
+          let markerRow = markerPosition === "top" ? 0 : gridHeight - 1;
+          for (let i = 0; i < numRowsToRepeat; i++) {
+            let col;
+            if (startingSide === "left") {
+              col = i;
+            } else {
+              col = gridWidth - 1 - i;
+            }
+            inputGrid[markerRow][col] = markerColor;
+            if (showMarkerInOutput) {
+              outputGrid[markerRow][col] = markerColor;
+            }
+          }
+        }
+
+        // Now, extend the pattern in the output grid
+        if (startingSide === "top") {
+          // Extend the column downwards
+          let currentRow = numRowsInColumn;
+          while (currentRow < gridHeight) {
+            for (let i = 0; i < numRowsToRepeat; i++) {
+              if (currentRow >= gridHeight) break;
+              let barInfo = markedRowsBars[i];
+              let fillColor = barInfo.fillColor;
+              let barStartCol = columnStartPos + barInfo.startOffset;
+              let barEndCol = barStartCol + barInfo.barWidth;
+              for (let col = barStartCol; col < barEndCol; col++) {
+                outputGrid[currentRow][col] = fillColor;
+              }
+              currentRow++;
+            }
+          }
+        } else if (startingSide === "bottom") {
+          // Extend the column upwards, copying rows from bottom to top
+          let currentRow = gridHeight - numRowsInColumn - 1;
+          while (currentRow >= 0) {
+            for (let i = numRowsToRepeat - 1; i >= 0; i--) {
+              if (currentRow < 0) break;
+              let barInfo = markedRowsBars[i];
+              let fillColor = barInfo.fillColor;
+              let barStartCol = columnStartPos + barInfo.startOffset;
+              let barEndCol = barStartCol + barInfo.barWidth;
+              for (let col = barStartCol; col < barEndCol; col++) {
+                outputGrid[currentRow][col] = fillColor;
+              }
+              currentRow--;
+            }
+          }
+        } else if (startingSide === "left") {
+          // Extend the column to the right
+          let currentCol = numRowsInColumn;
+          while (currentCol < gridWidth) {
+            for (let i = 0; i < numRowsToRepeat; i++) {
+              if (currentCol >= gridWidth) break;
+              let barInfo = markedRowsBars[i];
+              let fillColor = barInfo.fillColor;
+              let barStartRow = columnStartPos + barInfo.startOffset;
+              let barEndRow = barStartRow + barInfo.barWidth;
+              for (let row = barStartRow; row < barEndRow; row++) {
+                outputGrid[row][currentCol] = fillColor;
+              }
+              currentCol++;
+            }
+          }
+        } else if (startingSide === "right") {
+          // Extend the column to the left, copying columns from right to left
+          let currentCol = gridWidth - numRowsInColumn - 1;
+          while (currentCol >= 0) {
+            for (let i = numRowsToRepeat - 1; i >= 0; i--) {
+              if (currentCol < 0) break;
+              let barInfo = markedRowsBars[i];
+              let fillColor = barInfo.fillColor;
+              let barStartRow = columnStartPos + barInfo.startOffset;
+              let barEndRow = barStartRow + barInfo.barWidth;
+              for (let row = barStartRow; row < barEndRow; row++) {
+                outputGrid[row][currentCol] = fillColor;
+              }
+              currentCol--;
+            }
+          }
+        }
+
+        // Now, create the cells in the grid and set their background colors
+        for (let row = 0; row < gridHeight; row++) {
+          for (let col = 0; col < gridWidth; col++) {
+            const inputCell = document.createElement("div");
+            inputCell.style.width = "1px";
+            inputCell.style.height = "1px";
+            inputCell.style.backgroundColor = inputGrid[row][col];
+            inputGridDiv.appendChild(inputCell);
+
+            const outputCell = document.createElement("div");
+            outputCell.style.width = "1px";
+            outputCell.style.height = "1px";
+            outputCell.style.backgroundColor = outputGrid[row][col];
+            outputGridDiv.appendChild(outputCell);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

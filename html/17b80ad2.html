@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>17b80ad2</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getRandomColor(excludeColors) {
+        let availableColors = colors.filter(
+          (color) => !excludeColors.includes(color)
+        );
+        return availableColors[
+          Math.floor(Math.random() * availableColors.length)
+        ];
+      }
+
+      function createGrid(width, height, backgroundColor) {
+        const grid = document.createElement("div");
+        grid.style.width = `${width}px`;
+        grid.style.height = `${height}px`;
+        grid.style.position = "relative";
+        grid.style.backgroundColor = backgroundColor;
+        return grid;
+      }
+
+      function addPixel(grid, x, y, color) {
+        const pixel = document.createElement("div");
+        pixel.style.position = "absolute";
+        pixel.style.left = `${x}px`;
+        pixel.style.top = `${y}px`;
+        pixel.style.width = "1px";
+        pixel.style.height = "1px";
+        pixel.style.backgroundColor = color;
+        grid.appendChild(pixel);
+      }
+
+      function createPair(inputGrid, outputGrid) {
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+        inputContainer.appendChild(inputGrid);
+
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+        outputContainer.appendChild(outputGrid);
+
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        return pairDiv;
+      }
+
+      function generatePuzzle() {
+        const puzzleContainer = document.getElementById("puzzle-container");
+        puzzleContainer.innerHTML = ""; // Clear existing content
+
+        const numPairs = getRandomInt(2, 5);
+        const backgroundColor =
+          Math.random() < 0.6 ? "#111111" : getRandomColor(["#111111"]);
+        const baseColor = getRandomColor([backgroundColor]);
+        const directions = ["up", "down", "left", "right"];
+        const direction =
+          directions[Math.floor(Math.random() * directions.length)];
+
+        for (let i = 0; i < numPairs; i++) {
+          const gridSize = {
+            width: getRandomInt(7, 20),
+            height: getRandomInt(7, 20),
+          };
+
+          const inputGrid = createGrid(
+            gridSize.width,
+            gridSize.height,
+            backgroundColor
+          );
+          const outputGrid = createGrid(
+            gridSize.width,
+            gridSize.height,
+            backgroundColor
+          );
+
+          // Keep track of occupied positions
+          const occupiedPositions = new Set();
+
+          // Add base color pixels to the edge
+          const numBasePixels = getRandomInt(1, 4);
+          let basePixels = [];
+          for (let j = 0; j < numBasePixels; j++) {
+            let x, y;
+            do {
+              switch (direction) {
+                case "up":
+                  x = getRandomInt(0, gridSize.width - 1);
+                  y = gridSize.height - 1;
+                  break;
+                case "down":
+                  x = getRandomInt(0, gridSize.width - 1);
+                  y = 0;
+                  break;
+                case "left":
+                  x = gridSize.width - 1;
+                  y = getRandomInt(0, gridSize.height - 1);
+                  break;
+                case "right":
+                  x = 0;
+                  y = getRandomInt(0, gridSize.height - 1);
+                  break;
+              }
+            } while (occupiedPositions.has(`${x},${y}`));
+
+            addPixel(inputGrid, x, y, baseColor);
+            addPixel(outputGrid, x, y, baseColor);
+            basePixels.push({ x, y });
+            occupiedPositions.add(`${x},${y}`);
+          }
+
+          // Add random pixels to input grid, avoiding the base edge and occupied positions
+          const maxRandomPixels = Math.floor(
+            (gridSize.width * gridSize.height) / 4
+          );
+          let randomPixelsAdded = 0;
+          let attempts = 0;
+          const maxAttempts = gridSize.width * gridSize.height * 2; // Arbitrary large number to prevent infinite loop
+
+          while (
+            randomPixelsAdded < maxRandomPixels &&
+            attempts < maxAttempts
+          ) {
+            let x, y;
+            do {
+              x = getRandomInt(0, gridSize.width - 1);
+              y = getRandomInt(0, gridSize.height - 1);
+              attempts++;
+            } while (
+              (direction === "up" && y === gridSize.height - 1) ||
+              (direction === "down" && y === 0) ||
+              (direction === "left" && x === gridSize.width - 1) ||
+              (direction === "right" && x === 0) ||
+              occupiedPositions.has(`${x},${y}`)
+            );
+
+            if (!occupiedPositions.has(`${x},${y}`)) {
+              const randomColor = getRandomColor([backgroundColor, baseColor]);
+              addPixel(inputGrid, x, y, randomColor);
+              addPixel(outputGrid, x, y, randomColor);
+              occupiedPositions.add(`${x},${y}`);
+              randomPixelsAdded++;
+            }
+
+            if (attempts >= maxAttempts) {
+              console.log(
+                `Reached max attempts for pair ${
+                  i + 1
+                }. Added ${randomPixelsAdded} random pixels.`
+              );
+              break;
+            }
+          }
+
+          // Draw lines in output grid
+          basePixels.forEach((pixel) => {
+            let currentX = pixel.x;
+            let currentY = pixel.y;
+            let currentColor = baseColor;
+
+            while (true) {
+              switch (direction) {
+                case "up":
+                  currentY--;
+                  break;
+                case "down":
+                  currentY++;
+                  break;
+                case "left":
+                  currentX--;
+                  break;
+                case "right":
+                  currentX++;
+                  break;
+              }
+
+              if (
+                currentX < 0 ||
+                currentX >= gridSize.width ||
+                currentY < 0 ||
+                currentY >= gridSize.height
+              ) {
+                break;
+              }
+
+              const existingPixel = outputGrid.querySelector(
+                `div[style*="left: ${currentX}px"][style*="top: ${currentY}px"]`
+              );
+              if (existingPixel) {
+                currentColor = existingPixel.style.backgroundColor;
+              }
+
+              addPixel(outputGrid, currentX, currentY, currentColor);
+            }
+          });
+
+          const pairElement = createPair(inputGrid, outputGrid);
+          puzzleContainer.appendChild(pairElement);
+        }
+      }
+
+      // Generate the puzzle on page load
+      window.onload = generatePuzzle;
+    </script>
+  </body>
+</html>

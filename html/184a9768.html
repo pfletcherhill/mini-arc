@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>184a9768</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="puzzle-container">
+      <!-- Pairs will be dynamically added here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getRandomColor(excludeColors) {
+        let color;
+        do {
+          color = colors[Math.floor(Math.random() * colors.length)];
+        } while (excludeColors.includes(color));
+        return color;
+      }
+
+      function createRectangle(width, height, color, x, y) {
+        return `<div style="position:absolute; width:${width}px; height:${height}px; background-color:${color}; left:${x}px; top:${y}px;"></div>`;
+      }
+
+      function isOverlapping(rect1, rect2) {
+        return (
+          rect1.x < rect2.x + rect2.width &&
+          rect1.x + rect1.width > rect2.x &&
+          rect1.y < rect2.y + rect2.height &&
+          rect1.y + rect1.height > rect2.y
+        );
+      }
+
+      function splitRectangle(rect) {
+        if (Math.random() < 0.5 || (rect.width === 1 && rect.height === 1)) {
+          return [rect]; // Don't split 50% of the time or if it's a 1x1 rectangle
+        }
+
+        if (rect.width > rect.height) {
+          const splitPoint = getRandomInt(1, rect.width - 1);
+          return [
+            { ...rect, width: splitPoint },
+            { ...rect, x: rect.x + splitPoint, width: rect.width - splitPoint },
+          ];
+        } else {
+          const splitPoint = getRandomInt(1, rect.height - 1);
+          return [
+            { ...rect, height: splitPoint },
+            {
+              ...rect,
+              y: rect.y + splitPoint,
+              height: rect.height - splitPoint,
+            },
+          ];
+        }
+      }
+
+      function generatePuzzle() {
+        const container = document.getElementById("puzzle-container");
+        const numPairs = getRandomInt(2, 5);
+        const backgroundColor =
+          Math.random() < 0.6 ? "#111111" : getRandomColor(["#111111"]);
+        const noiseColor = getRandomColor([backgroundColor]);
+
+        for (let i = 0; i < numPairs; i++) {
+          const gridWidth = getRandomInt(16, 26);
+          const gridHeight = getRandomInt(16, 26);
+
+          let inputHTML = "";
+          let outputHTML = "";
+
+          // Create larger rectangles
+          const numLargeRects = getRandomInt(1, 2);
+          const largeRects = [];
+
+          for (let j = 0; j < numLargeRects; j++) {
+            const rectWidth = getRandomInt(7, 11);
+            const rectHeight = getRandomInt(7, 11);
+            let rectX, rectY;
+            let attempts = 0;
+            let placed = false;
+
+            while (attempts < 50 && !placed) {
+              rectX = getRandomInt(0, gridWidth - rectWidth);
+              rectY = getRandomInt(0, gridHeight - rectHeight);
+              const newRect = {
+                x: rectX,
+                y: rectY,
+                width: rectWidth,
+                height: rectHeight,
+              };
+
+              if (!largeRects.some((rect) => isOverlapping(newRect, rect))) {
+                const rectColor = getRandomColor([backgroundColor, noiseColor]);
+                largeRects.push({ ...newRect, color: rectColor });
+                outputHTML += createRectangle(
+                  rectWidth,
+                  rectHeight,
+                  rectColor,
+                  rectX,
+                  rectY
+                );
+                inputHTML += createRectangle(
+                  rectWidth,
+                  rectHeight,
+                  rectColor,
+                  rectX,
+                  rectY
+                );
+                placed = true;
+              }
+
+              attempts++;
+            }
+          }
+
+          // Create smaller rectangles
+          const smallRects = [];
+
+          largeRects.forEach((largeRect) => {
+            const numSmallRects = getRandomInt(2, 5);
+            const usedColors = [backgroundColor, noiseColor, largeRect.color];
+            const smallRectsInLarge = [];
+
+            for (let k = 0; k < numSmallRects; k++) {
+              const smallWidth = getRandomInt(1, 5);
+              const smallHeight = getRandomInt(1, 5);
+              if (smallWidth === smallHeight) continue; // Avoid squares
+
+              let smallX, smallY;
+              let placed = false;
+              let attempts = 0;
+
+              while (attempts < 50 && !placed) {
+                if (Math.random() < 0.8) {
+                  // 80% chance of having padding
+                  smallX = getRandomInt(
+                    largeRect.x + 1,
+                    largeRect.x + largeRect.width - smallWidth - 1
+                  );
+                  smallY = getRandomInt(
+                    largeRect.y + 1,
+                    largeRect.y + largeRect.height - smallHeight - 1
+                  );
+                } else {
+                  smallX = getRandomInt(
+                    largeRect.x,
+                    largeRect.x + largeRect.width - smallWidth
+                  );
+                  smallY = getRandomInt(
+                    largeRect.y,
+                    largeRect.y + largeRect.height - smallHeight
+                  );
+                }
+
+                const newSmallRect = {
+                  x: smallX,
+                  y: smallY,
+                  width: smallWidth,
+                  height: smallHeight,
+                };
+
+                if (
+                  !smallRectsInLarge.some((rect) =>
+                    isOverlapping(newSmallRect, rect)
+                  )
+                ) {
+                  const existingSameShape = smallRectsInLarge.find(
+                    (rect) =>
+                      rect.width === smallWidth && rect.height === smallHeight
+                  );
+                  let smallColor;
+
+                  if (existingSameShape) {
+                    smallColor = existingSameShape.color;
+                  } else {
+                    smallColor = getRandomColor(usedColors);
+                    usedColors.push(smallColor);
+                  }
+
+                  newSmallRect.color = smallColor;
+                  smallRectsInLarge.push(newSmallRect);
+                  smallRects.push(newSmallRect);
+
+                  outputHTML += createRectangle(
+                    smallWidth,
+                    smallHeight,
+                    smallColor,
+                    smallX,
+                    smallY
+                  );
+                  inputHTML += createRectangle(
+                    smallWidth,
+                    smallHeight,
+                    backgroundColor,
+                    smallX,
+                    smallY
+                  );
+                  placed = true;
+                }
+
+                attempts++;
+              }
+            }
+          });
+
+          // Add small rectangles to input grid
+          smallRects.forEach((rect) => {
+            const splitRects = splitRectangle(rect);
+            splitRects.forEach((splitRect) => {
+              let newX, newY;
+              let placed = false;
+              let attempts = 0;
+
+              while (attempts < 50 && !placed) {
+                newX = getRandomInt(0, gridWidth - splitRect.width);
+                newY = getRandomInt(0, gridHeight - splitRect.height);
+                const newRect = {
+                  x: newX,
+                  y: newY,
+                  width: splitRect.width,
+                  height: splitRect.height,
+                };
+
+                if (
+                  !largeRects.some((largeRect) =>
+                    isOverlapping(newRect, largeRect)
+                  ) &&
+                  !smallRects.some((smallRect) =>
+                    isOverlapping(newRect, smallRect)
+                  )
+                ) {
+                  inputHTML += createRectangle(
+                    splitRect.width,
+                    splitRect.height,
+                    splitRect.color,
+                    newX,
+                    newY
+                  );
+                  placed = true;
+                }
+
+                attempts++;
+              }
+            });
+          });
+
+          // Add noise to input grid
+          const numNoiseSquares = getRandomInt(2, 10);
+          for (let l = 0; l < numNoiseSquares; l++) {
+            let noiseX, noiseY;
+            let placed = false;
+            let attempts = 0;
+
+            while (attempts < 50 && !placed) {
+              noiseX = getRandomInt(0, gridWidth - 1);
+              noiseY = getRandomInt(0, gridHeight - 1);
+              const noiseRect = { x: noiseX, y: noiseY, width: 1, height: 1 };
+
+              if (
+                !largeRects.some((rect) => isOverlapping(noiseRect, rect)) &&
+                !smallRects.some((rect) => isOverlapping(noiseRect, rect))
+              ) {
+                inputHTML += createRectangle(1, 1, noiseColor, noiseX, noiseY);
+                placed = true;
+              }
+
+              attempts++;
+            }
+          }
+
+          container.innerHTML += `
+            <div class="pair">
+              <div class="container">
+                <div id="input-${
+                  i + 1
+                }" class="grid" style="width:${gridWidth}px;height:${gridHeight}px;background-color:${backgroundColor};">
+                  ${inputHTML}
+                </div>
+              </div>
+              <div class="container">
+                <div id="output-${
+                  i + 1
+                }" class="grid" style="width:${gridWidth}px;height:${gridHeight}px;background-color:${backgroundColor};">
+                  ${outputHTML}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      window.onload = generatePuzzle;
+    </script>
+  </body>
+</html>

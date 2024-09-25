@@ -1,0 +1,10 @@
+- For each pair, the input and output grids should be the same size, which is 9x9px to 20x20px, though they don't have to be square.
+- For the puzzle, pick a center color and a square color, which can be any colors. All pairs should use these colors.
+- For the puzzle, also pick a square radius, which is 1px to 3px. All pairs should use this param.
+- Each pair can also pick their own background color. All grids in the puzzle don't have to have the same background color, though each input and output grid in a pair have to have the same background color.
+- For each input grid, add 2-5 random 1px squares to the input grid. The squares should not touch or overlap and should all have the same color, which can be any color except the pair's background color.
+- For each output grid, follow these steps:
+  1. For each of the squares added to the input grid, add a square to the output grid using the square color picked above. The square in the output grid should be centered on the 1px square in the input grid and be sized according to the radius size for the puzzle. If the radius is 2px, then it should be 5x5px in size—1px for the middle and 2px on all sides.
+  2. For each of the squares in the input grid, draw a vertical and horizontal line on the output grid in the color of the square in the input grid, where each line intersects on either the x- or y-axis respectively with the 1px square in the input grid. The lines drawn on the output grid should be above the squares drawn in step 1.
+  3. Finally, add a 1px square in the same position as each of the squares in the input grid to the output grid in the center color picked above. These 1px squares should be on top of both the other squares and the lines in the output grid.
+  

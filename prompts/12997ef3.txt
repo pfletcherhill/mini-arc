@@ -1,0 +1,7 @@
+- For the puzzle, pick a shape color, which can be any color except the background color. Use that color as the shape color for all grid pairs.
+- For the puzzle, also pick a shape size, which can be anything from 2x2px to 5x5px, though it doesn't have to be square. Use this shape size for all grid pairs.
+- Each input grid should be between 9x9px and 20x20px, though doesn't have to be square.
+- For each input grid, place a rectangle the size of the shape size in the input grid and fill it with a pattern using random pixels in the shape color. Then place 2-4 1px squares in a row (either vertically or horizontally) with a 1px gap in between them somewhere else in the grid that doesn't overlap with the shape. Each of the squares in the row should be a random color, that can be any color except the background color.
+- For each output grid, the size should be a function of the shape size and the number of squares in the row in the input grid. If the row of squares is vertical, then the output grid should be the shape size extended vertically for the nubmer of squares. So if the shape is 2x3px and there are 3 squares in a vertical row, then the output grid should be 2x9px. If the row is horizontal, then the output would be 6x3px.
+- For each output grid, fill the grid by repeating the size and pattern from the input grid in the output grid. For each of the squares in the row, repeat the shape from the input grid using the color of that square to fill in the same pixels used by the shape color in the input.
+
