@@ -3,7 +3,7 @@ from typing import Optional
 import modal
 import torch
 
-from arc_prize.data import ARCDatasetParams, make_data_loaders, make_re_arc_data_loaders
+from arc_prize.data import ARCDatasetParams, make_data_loaders
 from arc_prize.model import (
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
@@ -27,6 +27,7 @@ data_volume = modal.Volume.from_name("arc-data")
 def train(
     model_name: str,
     num_epochs: int,
+    model_type: Optional[str] = "normal",
     model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
     train_params: Optional[ARCTrainParams] = None,
 ):
@@ -35,6 +36,7 @@ def train(
     if model_params is not None and train_params is not None:
         print("Starting new model", model_name)
         model_state = ARCModelState(
+            model_type=model_type,
             model_state_dict=None,
             model_params=model_params,
             train_params=train_params,
@@ -70,8 +72,11 @@ def evaluate_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = ARCModelState(**torch.load(model_filename, map_location=device))
 
-    model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
-    # model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
+    if checkpoint.model_type == "vision":
+        model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
+    else:
+        model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
+
     if checkpoint.model_state_dict is not None:
         model.load_state_dict(checkpoint.model_state_dict)
 

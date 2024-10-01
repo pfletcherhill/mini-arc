@@ -189,6 +189,7 @@ def visualize_tensors(
     grids: torch.Tensor,
     output_grid: Optional[torch.Tensor],
     prediction: Optional[torch.Tensor],
+    finetune_prediction: Optional[torch.Tensor],
 ):
     # Create a colormap from the list of colors
     cmap = mcolors.ListedColormap(COLORS)
@@ -248,6 +249,10 @@ def visualize_tensors(
     if prediction is not None:
         plot_grid(axes[-1, 2], prediction)
         axes[-1, 2].set_title("Prediction")
+
+    if finetune_prediction is not None:
+        plot_grid(axes[-1, 3], finetune_prediction)
+        axes[-1, 3].set_title("Fine-tuned Prediction")
 
     plt.tight_layout()
     plt.show()

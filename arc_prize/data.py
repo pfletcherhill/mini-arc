@@ -1,3 +1,4 @@
+import itertools
 import json
 import random
 from dataclasses import dataclass
@@ -35,6 +36,104 @@ def pad_and_mask_grid(
     mask[pad_h : pad_h + h, pad_w : pad_w + w] = True
 
     return (padded, mask)
+
+
+def unpad_grid(grid: torch.Tensor) -> list[list[int]]:
+    grid = grid - 1
+    filtered_rows: list[list] = []
+    for row in grid:
+        filtered_row = row[row != -1]
+        if len(filtered_row) > 0:
+            filtered_rows.append(filtered_row.tolist())
+    # Hack to ensure there's always at least one value
+    if len(filtered_rows) == 0:
+        filtered_rows.append([0])
+    max_length = max(len(row) for row in filtered_rows)
+    padded_rows = [(row + [0] * (max_length - len(row))) for row in filtered_rows]
+    return padded_rows
+
+
+class FinetuneDataset(Dataset):
+    tasks: list[list[list[list[list[int]]]]]
+    config: ARCDatasetParams
+
+    def __init__(
+        self,
+        tasks: list[list[list[list[list[int]]]]],
+        config: ARCDatasetParams,
+    ):
+        self.tasks = tasks
+        self.config = config
+
+    def __len__(self) -> int:
+        return len(self.tasks)
+
+    def __getitem__(self, idx: int) -> dict:
+        task = self.tasks[idx]
+
+        grids = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.int,
+        )
+        masks = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.bool,
+        )
+
+        for i, pair in enumerate(task[:-1]):
+            if i >= self.config.max_train_grids:
+                print("Training pairs exceed max", i, self.config.max_train_grids)
+                break
+
+            input_grid, input_mask = pad_and_mask_grid(pair[0], self.config)
+            output_grid, output_mask = pad_and_mask_grid(pair[1], self.config)
+            grids[2 * i] = input_grid
+            masks[2 * i] = input_mask
+            grids[2 * i + 1] = output_grid
+            masks[2 * i + 1] = output_mask
+
+        test_input_grid, test_input_mask = pad_and_mask_grid(task[-1][0], self.config)
+        grids[-1] = test_input_grid
+        masks[-1] = test_input_mask
+
+        test_output_grid = pad_and_mask_grid(task[-1][1], self.config)[0]
+
+        return {
+            "grids": grids,
+            "masks": masks,
+            "output": test_output_grid,
+        }
+
+
+def make_finetune_dataset(
+    grids: torch.Tensor, config: ARCDatasetParams
+) -> FinetuneDataset:
+    if len(grids.shape) == 3:
+        grids = grids.unsqueeze(0)
+    if len(grids.shape) != 4:
+        raise Exception("incorrect grids dimension")
+    tasks = []
+    for task in grids:
+        pairs = task[:-1].reshape(
+            config.max_train_grids,
+            2,
+            config.max_grid_size,
+            config.max_grid_size,
+        )
+        finetune_pairs: list[list[list[list[int]]]] = []
+        for pair in pairs:
+            finetune_pairs.append([unpad_grid(grid) for grid in pair])
+
+        for length in range(2, len(finetune_pairs) + 1):
+            for combination in itertools.combinations(finetune_pairs, length):
+                for permutation in itertools.permutations(combination):
+                    tasks.append(list(permutation))
+
+    return FinetuneDataset(tasks=tasks, config=config)
 
 
 class ARCDataset(Dataset):

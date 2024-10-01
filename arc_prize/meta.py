@@ -1,7 +1,5 @@
-import copy
 import time
-from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, OrderedDict
 
 import torch
 import torch.nn as nn
@@ -23,86 +21,38 @@ from arc_prize.model import (
     ARCTransformerEncoderDecoderParams,
     ARCVisionEncoderDecoder,
 )
+from arc_prize.train import (
+    ARCModelState,
+    ARCTrainParams,
+    EpochState,
+    calculate_grad_norm,
+    calculate_param_norm,
+)
 
 
-@dataclass(frozen=True)
-class ARCTrainParams:
-    batch_size: int
-    learning_rate: float
-    weight_decay: float
-    dataset_dir: list[str]
-    loss_class_weights: Optional[dict[int, float]] = None
-    meta_batch_size: Optional[int] = None
-    meta_learning_rate: Optional[float] = None
-    meta_weight_decay: Optional[float] = None
-    meta_num_epochs: Optional[int] = None
-
-
-@dataclass(frozen=True)
-class EpochState:
-    train_loss: float
-    train_accuracy: float
-    val_loss: float
-    val_accuracy: float
-    lr: float
-    weight_decay: float
-    beta1: float
-    beta2: float
-    epsilon: float
-    grad_norm: float
-    param_norm: float
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-
-
-@dataclass
-class ARCModelState:
-    model_params: ARCTransformerEncoderDecoderParams
-    model_type: Optional[str]
-    model_state_dict: Optional[dict]
-    train_params: ARCTrainParams
-    optimizer_state_dict: Optional[dict]
-    epochs: list[EpochState]
-    best_val_loss: float
-    # encoder_attn_weights: Optional[list] = None # Too large to keep
-
-
-def calculate_grad_norm(model: ARCTransformerEncoderDecoder):
-    total_norm = 0
-    for p in model.parameters():
-        if p.grad is not None:
-            param_norm = p.grad.data.norm(2)
-            total_norm += param_norm.item() ** 2
-    return total_norm**0.5
-
-
-def calculate_param_norm(model: ARCTransformerEncoderDecoder):
-    total_norm = 0
-    for p in model.parameters():
-        param_norm = p.data.norm(2)
-        total_norm += param_norm.item() ** 2
-    return total_norm**0.5
-
-
-def fine_tune_transformer(
+def meta_fine_tune_transformer(
     model: nn.Module, train_params: ARCTrainParams, dataset: FinetuneDataset
-) -> nn.Module:
+) -> dict[str, torch.Tensor]:
+    if (
+        train_params.meta_batch_size is None
+        or train_params.meta_learning_rate is None
+        or train_params.meta_weight_decay is None
+    ):
+        raise Exception(
+            "meta_batch_size, meta_learning_rate, and meta_weight_decay must all be defined"
+        )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    torch.backends.mha.set_fastpath_enabled(False)
-
-    model = model.to(device)
 
     data_loader = DataLoader(
         dataset,
-        batch_size=train_params.batch_size,
+        batch_size=train_params.meta_batch_size,
         shuffle=True,
         collate_fn=collate_arc_fn,
         num_workers=0,
     )
 
-    print(f"Starting fine-tuning run with dataset of {len(dataset)} training items")
-    print(f"Using batch size of {train_params.batch_size}")
+    print(f"Starting inner loop with {len(data_loader.dataset)} tasks")
 
     class_weights = torch.ones(model.num_classes).to(device)
     if train_params.loss_class_weights is not None:
@@ -111,39 +61,52 @@ def fine_tune_transformer(
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-    optimizer = optim.AdamW(
-        model.parameters(),
-        lr=train_params.learning_rate,
-        weight_decay=train_params.weight_decay,
+    num_epochs = train_params.meta_num_epochs or 10
+
+    print("Inner Loop parameters")
+    for name, param in model.named_parameters():
+        print(name, param.shape, param.device, param.requires_grad)
+
+    # adapted_params = {name: param for name, param in model.named_parameters()}
+    # adapted_params = OrderedDict(model.named_parameters())
+    params = model.named_parameters()
+    adapted_params = OrderedDict(
+        {name: param.to(device=device) for name, param in params if param.requires_grad}
     )
 
-    scaler = GradScaler(device.type)
+    def get_adapted_params():
+        for param in adapted_params.values():
+            yield param
 
-    num_epochs = 20
+    optimizer = optim.SGD(get_adapted_params(), lr=train_params.meta_learning_rate)
 
-    model.train()
+    start_time = time.time()
 
     for epoch in range(num_epochs):
         train_loss = 0.0
         train_accuracy = 0.0
-        start_time = time.time()
 
         for batch in data_loader:
             grids, masks, target_grid = [item.to(device) for item in batch]
 
-            optimizer.zero_grad()
-
             with autocast(device.type):
-                output = model.forward(grids, masks)[0]
+                output = torch.func.functional_call(
+                    model, adapted_params, (grids, masks), {}
+                )[0]
                 loss = criterion(
                     output.view(-1, model.num_classes),
                     target_grid.view(-1).long(),
                 )
 
-            # Use the scaler for backpropagation and optimization
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            grads = torch.autograd.grad(
+                loss, adapted_params.values(), create_graph=True
+            )
+
+            for param, grad in zip(adapted_params.values(), grads):
+                param.grad = grad
+
+            optimizer.step()
+            optimizer.zero_grad()
 
             train_loss += loss.item()
 
@@ -153,19 +116,17 @@ def fine_tune_transformer(
         train_loss /= len(data_loader)
         train_accuracy /= len(data_loader)
 
-        end_time = time.time()
+    end_time = time.time()
+    duration = end_time - start_time
 
-        print(f"Epoch {epoch+1}/{num_epochs}:")
-        print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
+    print(
+        f"Fine-tuning finished - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Total duration: {duration:.2f}s ({(duration / 60):.2f}m)"
+    )
 
-        duration = end_time - start_time
-        print(f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)")
-
-    print("Fine-tuning completed")
-    return model
+    return adapted_params
 
 
-def train_arc_transformer(
+def meta_train_arc_transformer(
     model_filename: str,
     num_epochs: int,
     patience: int = 10,
@@ -186,11 +147,13 @@ def train_arc_transformer(
     if checkpoint.model_state_dict is not None:
         model.load_state_dict(checkpoint.model_state_dict)
 
+    model = model.to(device)
+
     parallel_model = nn.DataParallel(model)
 
     print(f"Using {torch.cuda.device_count()} GPUs in parallel")
 
-    parallel_model = parallel_model.to(device)
+    print("Model", parallel_model.module.state_dict().keys())
 
     dataset_params = ARCDatasetParams(
         max_grid_size=parallel_model.module.grid_dim,
@@ -247,14 +210,27 @@ def train_arc_transformer(
         train_accuracy = 0.0
         start_time = time.time()
 
-        for batch in train_loader:
-            # grids, masks, target_grid = batch
+        for i, batch in enumerate(train_loader):
+            print(f"Starting outer loop batch {i + 1}/{len(train_loader)}")
             grids, masks, target_grid = [item.to(device) for item in batch]
 
             optimizer.zero_grad()
 
+            finetune_dataset = make_finetune_dataset(grids, dataset_params)
+
+            adapted_params = meta_fine_tune_transformer(
+                parallel_model.module, train_params, finetune_dataset
+            )
+
+            # with torch.no_grad():
+            #     for name, param in parallel_model.module.named_parameters():
+            #         param.copy_(adapted_params[name])
+
             with autocast(device.type):
-                output = parallel_model.forward(grids, masks)[0]
+                # output = parallel_model.forward(grids, masks)[0]
+                output = torch.func.functional_call(
+                    parallel_model.module, adapted_params, (grids, masks)
+                )[0]
                 loss = criterion(
                     output.view(-1, parallel_model.module.num_classes),
                     target_grid.view(-1).long(),
@@ -264,9 +240,6 @@ def train_arc_transformer(
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-
-            # loss.backward()
-            # optimizer.step()
 
             train_loss += loss.item()
 
@@ -285,8 +258,16 @@ def train_arc_transformer(
                 # grids, masks, target_grid = batch
                 grids, masks, target_grid = [item.to(device) for item in batch]
 
+                finetune_dataset = make_finetune_dataset(grids, dataset_params)
+
+                adapted_params = meta_fine_tune_transformer(
+                    parallel_model.module, train_params, finetune_dataset
+                )
+
                 with autocast(device.type):
-                    output = parallel_model.forward(grids, masks)[0]
+                    output = torch.func.functional_call(
+                        parallel_model.module, adapted_params, (grids, masks), {}
+                    )[0]
                     loss = criterion(
                         output.view(-1, parallel_model.module.num_classes),
                         target_grid.view(-1).long(),
@@ -359,7 +340,7 @@ def train_arc_transformer(
     print("Training completed")
 
 
-def train_on_mac(
+def meta_train_on_mac(
     model_name: str,
     num_epochs: int,
     model_type: Optional[str] = "normal",
@@ -381,4 +362,6 @@ def train_on_mac(
         )
         torch.save(model_state.__dict__, model_filename)
 
-    return train_arc_transformer(model_filename, num_epochs, train_params=train_params)
+    return meta_train_arc_transformer(
+        model_filename, num_epochs, train_params=train_params
+    )
