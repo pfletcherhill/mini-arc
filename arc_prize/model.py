@@ -66,11 +66,11 @@ class EncoderLayerWithAttention(nn.TransformerEncoderLayer):
             average_attn_weights=False,
         )
 
-        x.add_(self.dropout1(x1))
+        x = x + self.dropout1(x1)
         x = self.norm1(x)
 
         x1 = self.linear2(self.dropout(self.activation(self.linear1(x))))
-        x.add_(self.dropout2(x1))
+        x = x + self.dropout2(x1)
         x = self.norm2(x)
 
         return x, attn_weights

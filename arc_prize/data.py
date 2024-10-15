@@ -349,9 +349,9 @@ def collate_arc_fn(
     return (grids, masks, output)
 
 
-def make_data_loaders(
-    dataset_dir: list[str], batch_size: int, params: ARCDatasetParams
-) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
+def make_datasets(
+    dataset_dir: list[str], params: ARCDatasetParams
+) -> tuple[Dataset, Dataset]:
     train_datasets = []
     val_datasets = []
 
@@ -371,6 +371,14 @@ def make_data_loaders(
 
     train_dataset = ConcatDataset(train_datasets)
     val_dataset = ConcatDataset(val_datasets)
+
+    return (train_dataset, val_dataset)
+
+
+def make_data_loaders(
+    dataset_dir: list[str], batch_size: int, params: ARCDatasetParams
+) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
+    train_dataset, val_dataset = make_datasets(dataset_dir, params)
 
     train_loader = DataLoader(
         train_dataset,

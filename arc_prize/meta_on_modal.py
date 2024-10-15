@@ -1,13 +1,15 @@
-import copy
-import itertools
 from typing import Optional
 
 import modal
 import torch
 from torch.utils.data import ConcatDataset
 
-from arc_prize.data import ARCDataset, ARCDatasetParams, FinetuneDataset, unpad_grid
-from arc_prize.meta import meta_train_arc_transformer
+from arc_prize.data import (
+    ARCDataset,
+    ARCDatasetParams,
+    make_finetune_dataset,
+)
+from arc_prize.meta import meta_fine_tune_transformer, meta_train_arc_transformer
 from arc_prize.model import (
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
@@ -15,7 +17,7 @@ from arc_prize.model import (
 )
 from arc_prize.train import ARCModelState, ARCTrainParams, fine_tune_transformer
 
-modal_image = modal.Image.debian_slim().pip_install("torch")
+modal_image = modal.Image.debian_slim().pip_install("torch>=2.3.1")
 modal_app = modal.App(name="arc-prize-meta", image=modal_image)
 
 
@@ -24,7 +26,7 @@ data_volume = modal.Volume.from_name("arc-data")
 
 
 @modal_app.function(
-    gpu="A100:2",
+    gpu="a10g",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60 * 24),
 )
@@ -69,6 +71,8 @@ def finetune_and_predict(
     checkpoint_dict["model_type"] = checkpoint_dict.get("model_type", None) or "normal"
     checkpoint = ARCModelState(**checkpoint_dict)
 
+    train_params = checkpoint.train_params
+
     if checkpoint.model_type == "vision":
         model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
     else:
@@ -108,53 +112,29 @@ def finetune_and_predict(
             need_weights=False,
         )[0][0]
 
-        # Fine-tune model
-        pairs = task["grids"][:-1].reshape(
-            dataset_params.max_train_grids,
-            2,
-            dataset_params.max_grid_size,
-            dataset_params.max_grid_size,
-        )
-        finetune_pairs: list[list[list[list[int]]]] = []
-        for pair in pairs:
-            finetune_pairs.append([unpad_grid(grid) for grid in pair])
-
-        finetune_permutations = []
-        for length in range(2, len(finetune_pairs) + 1):
-            for combination in itertools.combinations(finetune_pairs, length):
-                for permutation in itertools.permutations(combination):
-                    finetune_permutations.append(list(permutation))
-
-        finetune_dataset = FinetuneDataset(
-            tasks=finetune_permutations, config=dataset_params
-        )
-        finetune_model = copy.deepcopy(model)
-
-        train_params = ARCTrainParams(
-            batch_size=2,
-            learning_rate=1e-5,
-            weight_decay=1e-5,
-            dataset_dir=[],
-            loss_class_weights={0: 0.2},
+        finetune_dataset = make_finetune_dataset(
+            task["grids"].to(device).unsqueeze(0), dataset_params
         )
 
-        finetune_model = fine_tune_transformer(
-            finetune_model, train_params, finetune_dataset
+        adapted_params = meta_fine_tune_transformer(
+            model, train_params, finetune_dataset
         )
 
-        # Predict
-        finetune_model.eval()
-        finetune_predictions = finetune_model.generate(
-            task["grids"].to(device).unsqueeze(0),
-            task["masks"].to(device).unsqueeze(0),
-            need_weights=False,
+        finetune_predictions = torch.func.functional_call(
+            model,
+            adapted_params,
+            (
+                task["grids"].to(device).unsqueeze(0),
+                task["masks"].to(device).unsqueeze(0),
+            ),
         )[0][0]
+
         output.append(
             {
-                "grids": task["grids"].cpu().numpy(),
-                "output_grid": task["output"].cpu().numpy(),
-                "predictions": predictions.cpu().numpy(),
-                "finetune_predictions": finetune_predictions.cpu().numpy(),
+                "grids": task["grids"].detach().cpu().numpy(),
+                "output_grid": task["output"].detach().cpu().numpy(),
+                "predictions": predictions.detach().cpu().numpy(),
+                "finetune_predictions": finetune_predictions.detach().cpu().numpy(),
             }
         )
 

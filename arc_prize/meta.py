@@ -6,10 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.amp.autocast_mode import autocast
 from torch.amp.grad_scaler import GradScaler
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.utils.data import DataLoader
 
 from arc_prize.data import (
-    ARCDataset,
     ARCDatasetParams,
     FinetuneDataset,
     collate_arc_fn,
@@ -63,10 +63,6 @@ def meta_fine_tune_transformer(
 
     num_epochs = train_params.meta_num_epochs or 10
 
-    print("Inner Loop parameters")
-    for name, param in model.named_parameters():
-        print(name, param.shape, param.device, param.requires_grad)
-
     # adapted_params = {name: param for name, param in model.named_parameters()}
     # adapted_params = OrderedDict(model.named_parameters())
     params = model.named_parameters()
@@ -78,18 +74,18 @@ def meta_fine_tune_transformer(
         for param in adapted_params.values():
             yield param
 
-    optimizer = optim.SGD(get_adapted_params(), lr=train_params.meta_learning_rate)
+    # optimizer = optim.SGD(get_adapted_params(), lr=train_params.meta_learning_rate)
 
     start_time = time.time()
 
-    for epoch in range(num_epochs):
-        train_loss = 0.0
-        train_accuracy = 0.0
+    with torch.autograd.set_detect_anomaly(True):
+        for epoch in range(num_epochs):
+            train_loss = 0.0
+            train_accuracy = 0.0
 
-        for batch in data_loader:
-            grids, masks, target_grid = [item.to(device) for item in batch]
+            for batch in data_loader:
+                grids, masks, target_grid = [item.to(device) for item in batch]
 
-            with autocast(device.type):
                 output = torch.func.functional_call(
                     model, adapted_params, (grids, masks), {}
                 )[0]
@@ -98,29 +94,38 @@ def meta_fine_tune_transformer(
                     target_grid.view(-1).long(),
                 )
 
-            grads = torch.autograd.grad(
-                loss, adapted_params.values(), create_graph=True
+                # TODO: figure out how to use second order gradients
+                grads = torch.autograd.grad(
+                    loss, adapted_params.values(), create_graph=False
+                )
+
+                # for param, grad in zip(adapted_params.values(), grads):
+                #     param.grad = grad
+
+                # optimizer.step()
+                # optimizer.zero_grad()
+                adapted_params = OrderedDict(
+                    (name, param - train_params.meta_learning_rate * grad)
+                    for ((name, param), grad) in zip(adapted_params.items(), grads)
+                )
+
+                train_loss += loss.item()
+
+                predictions = torch.argmax(output, dim=-1)
+                train_accuracy += (predictions == target_grid).float().mean().item()
+
+            train_loss /= len(data_loader)
+            train_accuracy /= len(data_loader)
+
+            print(
+                f"Adapation step {epoch + 1}/{num_epochs} - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}"
             )
-
-            for param, grad in zip(adapted_params.values(), grads):
-                param.grad = grad
-
-            optimizer.step()
-            optimizer.zero_grad()
-
-            train_loss += loss.item()
-
-            predictions = torch.argmax(output, dim=-1)
-            train_accuracy += (predictions == target_grid).float().mean().item()
-
-        train_loss /= len(data_loader)
-        train_accuracy /= len(data_loader)
 
     end_time = time.time()
     duration = end_time - start_time
 
     print(
-        f"Fine-tuning finished - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Total duration: {duration:.2f}s ({(duration / 60):.2f}m)"
+        f"Fine-tuning finished - Total duration: {duration:.2f}s ({(duration / 60):.2f}m)"
     )
 
     return adapted_params
@@ -214,20 +219,20 @@ def meta_train_arc_transformer(
             print(f"Starting outer loop batch {i + 1}/{len(train_loader)}")
             grids, masks, target_grid = [item.to(device) for item in batch]
 
-            optimizer.zero_grad()
-
             finetune_dataset = make_finetune_dataset(grids, dataset_params)
 
             adapted_params = meta_fine_tune_transformer(
                 parallel_model.module, train_params, finetune_dataset
             )
 
+            # with sdpa_kernel([SDPBackend.MATH]):
             # with torch.no_grad():
             #     for name, param in parallel_model.module.named_parameters():
             #         param.copy_(adapted_params[name])
 
+            optimizer.zero_grad()
+
             with autocast(device.type):
-                # output = parallel_model.forward(grids, masks)[0]
                 output = torch.func.functional_call(
                     parallel_model.module, adapted_params, (grids, masks)
                 )[0]
@@ -236,7 +241,6 @@ def meta_train_arc_transformer(
                     target_grid.view(-1).long(),
                 )
 
-            # Use the scaler for backpropagation and optimization
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -253,30 +257,29 @@ def meta_train_arc_transformer(
         parallel_model.eval()
         val_loss = 0.0
         val_accuracy = 0.0
-        with torch.no_grad():
-            for batch in val_loader:
-                # grids, masks, target_grid = batch
-                grids, masks, target_grid = [item.to(device) for item in batch]
+        for batch in val_loader:
+            # grids, masks, target_grid = batch
+            grids, masks, target_grid = [item.to(device) for item in batch]
 
-                finetune_dataset = make_finetune_dataset(grids, dataset_params)
+            finetune_dataset = make_finetune_dataset(grids, dataset_params)
 
-                adapted_params = meta_fine_tune_transformer(
-                    parallel_model.module, train_params, finetune_dataset
+            adapted_params = meta_fine_tune_transformer(
+                parallel_model.module, train_params, finetune_dataset
+            )
+
+            with autocast(device.type):
+                output = torch.func.functional_call(
+                    parallel_model.module, adapted_params, (grids, masks), {}
+                )[0]
+                loss = criterion(
+                    output.view(-1, parallel_model.module.num_classes),
+                    target_grid.view(-1).long(),
                 )
 
-                with autocast(device.type):
-                    output = torch.func.functional_call(
-                        parallel_model.module, adapted_params, (grids, masks), {}
-                    )[0]
-                    loss = criterion(
-                        output.view(-1, parallel_model.module.num_classes),
-                        target_grid.view(-1).long(),
-                    )
+            val_loss += loss.item()
 
-                val_loss += loss.item()
-
-                predictions = torch.argmax(output, dim=-1)
-                val_accuracy += (predictions == target_grid).float().mean().item()
+            predictions = torch.argmax(output, dim=-1)
+            val_accuracy += (predictions == target_grid).float().mean().item()
 
         val_loss /= len(val_loader)
         val_accuracy /= len(val_loader)
