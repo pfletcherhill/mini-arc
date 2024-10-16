@@ -40,44 +40,6 @@ class TrainParams:
     loss_class_weights: Optional[dict[int, float]] = None
 
 
-def rsqrt_schedule(
-    init_value: float,
-    shift: int = 0,
-):
-    """Applies a reverse square-root schedule.
-
-    The reverse square root schedule is simply `lr = init_value / sqrt(step)`.
-
-    Args:
-      init_value: Base learning rate (before applying the rsqrt schedule).
-      shift: How many steps the rsqrt should be shifted. Shifting the rsqrt
-        schedule makes it less steep in the beginning (close to 0).
-
-    Returns:
-      A schedule that applies the reverse square root.
-    """
-
-    def schedule(count):
-        return init_value * (count + shift) ** -0.5 * shift**0.5
-
-    return schedule
-
-
-def create_learning_rate_schedule(learning_rate: float, warmup_steps: int):
-    """Creates a rsqrt schedule with linear warmup."""
-    return optax.join_schedules(
-        [
-            optax.linear_schedule(
-                init_value=0,
-                end_value=learning_rate,
-                transition_steps=warmup_steps,
-            ),
-            rsqrt_schedule(init_value=learning_rate, shift=warmup_steps),
-        ],
-        boundaries=[warmup_steps],
-    )
-
-
 def loss_fn(
     model: ARCTransformerEncoderDecoder,
     batch: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
@@ -230,14 +192,16 @@ def train_and_evaluate(
 
         model = ARCTransformerEncoderDecoder(params=model_params, rngs=rngs)
 
-        learning_rate_fn = create_learning_rate_schedule(
-            learning_rate=train_params.learning_rate,
-            warmup_steps=train_params.warmup_steps,
+        warmup_lr_schedule = optax.schedules.warmup_constant_schedule(
+            0, train_params.learning_rate, warmup_steps=train_params.warmup_steps
         )
+        # plateau_lr_reducer = optax.contrib.reduce_on_plateau(factor=0.1, patience=5)
 
-        optimizer = optax.adamw(
-            learning_rate_fn,
-            weight_decay=train_params.weight_decay,
+        optimizer = optax.chain(
+            optax.adamw(
+                learning_rate=warmup_lr_schedule,
+                weight_decay=train_params.weight_decay,
+            ),
         )
 
         class_weights = jnp.ones(model.num_classes)
@@ -245,16 +209,12 @@ def train_and_evaluate(
             for cls, weight in train_params.loss_class_weights.items():
                 class_weights = class_weights.at[int(cls)].set(weight)
 
-        print("Saving checkpoint")
-
         state = setup_train_state(model, optimizer)
 
         checkpoint_mngr.save(0, args=ocp.args.StandardSave(state))
         checkpoint_mngr.wait_until_finished()
 
-        print(checkpoint_mngr.all_steps())
-
-        checkpoint_mngr.restore(checkpoint_mngr.latest_step(), state)
+        # checkpoint_mngr.restore(checkpoint_mngr.latest_step(), state)
         # print(restored_state_dict.keys())
         # restored_train_state = TrainState.create(
         #     tx=optimizer,
@@ -283,30 +243,29 @@ def train_and_evaluate(
             train_accuracy /= len(train_data_loader)
 
             train_time = time.perf_counter()
-            print(f"Train loop completed in {train_time - start_time}")
-            print(f"Train loss: {train_loss}, accuracy: {train_accuracy}")
+            print(f"Train loop completed in {(train_time - start_time):.2f}s")
+            print(f"Train loss: {train_loss:.4f}, accuracy: {train_accuracy:.4f}")
 
             # model.set_attributes(deterministic=True, decode=False)
-            val_losses = []
-            val_accuracy = []
-            val_data_loader = get_epoch_data_loader(
+            eval_loss = 0.0
+            eval_accuracy = 0.0
+            eval_data_loader = get_epoch_data_loader(
                 val_dataset,
                 train_params.batch_size,
                 num_steps=train_params.eval_steps_per_epoch,
             )
-            for batch in val_data_loader:
+            for batch in eval_data_loader:
                 loss, accuracy = eval_step(state, batch, class_weights)
-                val_losses.append(np.asarray(loss))
-                val_accuracy.append(np.asarray(accuracy))
+                eval_loss += loss.item()
+                eval_accuracy += accuracy.item()
+            eval_loss /= len(eval_data_loader)
+            eval_accuracy /= len(eval_data_loader)
 
             time_diff = time.perf_counter() - train_time
-            print(f"Eval loop completed in {time_diff}")
-            print(
-                f"Eval loss: {np.mean(val_losses)}, accuracy: {np.mean(val_accuracy)}"
-            )
+            print(f"Eval loop completed in {time_diff:.2f}")
+            print(f"Train loss: {eval_loss:.4f}, accuracy: {eval_accuracy:.4f}")
 
-            checkpoint_mngr.save(0, args=ocp.args.PyTreeSave(state))
-            checkpoint_mngr.wait_until_finished()
+            checkpoint_mngr.save(epoch + 1, args=ocp.args.StandardSave(state))
 
 
 def train_and_evaluate_local(

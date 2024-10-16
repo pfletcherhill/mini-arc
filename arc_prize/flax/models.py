@@ -62,6 +62,62 @@ def create_arc_fixed_positional_encoding(
     return jax.vmap(apply_encoding)(jnp.arange(2 * num_train_pairs + 1))
 
 
+class ARCPositionalEncoding(nnx.Module):
+    def __init__(
+        self, d_model: int, grid_dim: int, num_train_pairs: int, rngs: nnx.Rngs
+    ):
+        self.d_model = d_model
+        self.grid_dim = grid_dim
+        self.num_train_pairs = num_train_pairs
+
+        self.row_embedding = nnx.Embed(
+            num_embeddings=self.grid_dim, features=self.d_model // 4, rngs=rngs
+        )
+        self.col_embedding = nnx.Embed(
+            num_embeddings=self.grid_dim, features=self.d_model // 4, rngs=rngs
+        )
+        self.input_output_embedding = nnx.Embed(
+            num_embeddings=2, features=self.d_model // 4, rngs=rngs
+        )
+        self.pair_embedding = nnx.Embed(
+            num_embeddings=self.num_train_pairs + 1,
+            features=self.d_model // 4,
+            rngs=rngs,
+        )
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        _, num_grids, height, width, _ = x.shape
+
+        # Row position embeddings
+        row_pos = jnp.arange(height)
+        row_emb = self.row_embedding(row_pos)
+        row_emb = row_emb[None, :, None, :]
+        row_emb = jnp.broadcast_to(row_emb, (num_grids, height, width, -1))
+
+        # Column position embeddings
+        col_pos = jnp.arange(width)
+        col_emb = self.col_embedding(col_pos)
+        col_emb = col_emb[None, None, :, :]
+        col_emb = jnp.broadcast_to(col_emb, (num_grids, height, width, -1))
+
+        # Input/output embeddings
+        grid_indices = jnp.arange(num_grids)
+        is_output = (grid_indices % 2 == 1).astype(jnp.int32)
+        io_emb = self.input_output_embedding(is_output)
+
+        io_emb = io_emb[:, None, None, :]
+        io_emb = jnp.broadcast_to(io_emb, (num_grids, height, width, -1))
+
+        # Pair embeddings
+        pair_indices = jnp.floor_divide(grid_indices, 2).astype(jnp.int32)
+        pair_emb = self.pair_embedding(pair_indices)
+        pair_emb = pair_emb[:, None, None, :]
+        pair_emb = jnp.broadcast_to(pair_emb, (num_grids, height, width, -1))
+
+        combined_emb = jnp.concatenate([row_emb, col_emb, io_emb, pair_emb], axis=-1)
+        return combined_emb
+
+
 class MlpBlock(nnx.Module):
     def __init__(self, d_model: int, d_ff: int, dropout: float, rngs: nnx.Rngs):
         self.linear1 = nnx.Linear(
@@ -87,8 +143,15 @@ class MlpBlock(nnx.Module):
 
 class EncoderLayer(nnx.Module):
     def __init__(
-        self, d_model: int, num_heads: int, d_ff: int, dropout: float, rngs: nnx.Rngs
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dropout: float,
+        rngs: nnx.Rngs,
+        norm_first: bool = False,
     ):
+        self.norm_first = norm_first
         self.ln1 = nnx.LayerNorm(
             num_features=d_model,
             rngs=rngs,
@@ -121,20 +184,40 @@ class EncoderLayer(nnx.Module):
                 masks, jnp.ones((batch_size, input_len), dtype=jnp.bool)
             )
         # Self attention block
-        x = self.ln1(inputs)
+        if self.norm_first is True:
+            x = self.ln1(inputs)
+        else:
+            x = inputs
         x = self.self_attention(x, mask=masks, rngs=rngs)
         x = self.dropout(x, rngs=rngs)
         x = x + inputs
+        if self.norm_first is not True:
+            x = self.ln1(x)
+
         # MLP block
-        z = self.ln2(x)
-        z = self.mlp_block(z, rngs=rngs)
-        return x + z
+        if self.norm_first is True:
+            y = self.ln2(x)
+        else:
+            y = x
+        y = self.mlp_block(y, rngs=rngs)
+        y = x + y
+        if self.norm_first is not True:
+            y = self.ln2(y)
+
+        return y
 
 
 class DecoderLayer(nnx.Module):
     def __init__(
-        self, d_model: int, num_heads: int, d_ff: int, dropout: float, rngs: nnx.Rngs
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dropout: float,
+        rngs: nnx.Rngs,
+        norm_first: bool = False,
     ):
+        self.norm_first = norm_first
         self.ln1 = nnx.LayerNorm(
             num_features=d_model,
             rngs=rngs,
@@ -189,23 +272,40 @@ class DecoderLayer(nnx.Module):
             )
 
         # Self attention block
-        x = self.ln1(tgt)
+        if self.norm_first is True:
+            x = self.ln1(tgt)
+        else:
+            x = tgt
         x = self.self_attention(x, mask=self_attention_masks, rngs=rngs)
         x = self.dropout1(x, rngs=rngs)
         x = x + tgt
+        if self.norm_first is not True:
+            x = self.ln1(x)
 
         # Multihead attention block
-        y = self.ln2(x)
+        if self.norm_first is True:
+            y = self.ln2(x)
+        else:
+            y = x
         y = self.multihead_attention(
             y, memory, memory, mask=multihead_attention_masks, rngs=rngs
         )
         y = self.dropout2(y, rngs=rngs)
         y = y + x
+        if self.norm_first is not True:
+            y = self.ln2(y)
 
         # MLP block
-        z = self.ln3(y)
+        if self.norm_first is True:
+            z = self.ln3(y)
+        else:
+            z = y
         z = self.mlp_block(z, rngs=rngs)
-        return y + z
+        z = z + y
+        if self.norm_first is not True:
+            z = self.ln3(z)
+
+        return z
 
 
 class ARCTransformerEncoderDecoder(nnx.Module):
@@ -224,6 +324,12 @@ class ARCTransformerEncoderDecoder(nnx.Module):
 
         self.embedding = nnx.Embed(
             num_embeddings=self.num_classes, features=self.d_model, rngs=rngs
+        )
+        self.pos_encoding = ARCPositionalEncoding(
+            d_model=self.d_model,
+            grid_dim=self.grid_dim,
+            num_train_pairs=self.num_train_pairs,
+            rngs=rngs,
         )
         self.encoder_layers = [
             EncoderLayer(
@@ -247,7 +353,7 @@ class ARCTransformerEncoderDecoder(nnx.Module):
         ]
 
         self.output_query = nnx.Param(
-            jax.random.uniform(rngs.params(), (1, self.grid_dim**2, self.d_model))
+            jax.random.normal(rngs.params(), (1, self.grid_dim**2, self.d_model))
         )
 
         self.output_layer = nnx.Linear(
