@@ -179,10 +179,11 @@ class EncoderLayer(nnx.Module):
         rngs: nnx.Rngs | None = None,
     ) -> jax.Array:
         if masks is not None:
-            batch_size, input_len, _ = inputs.shape
             masks = nnx.make_attention_mask(
-                masks, jnp.ones((batch_size, input_len), dtype=jnp.bool)
+                masks,
+                masks,
             )
+
         # Self attention block
         if self.norm_first is True:
             x = self.ln1(inputs)
@@ -257,7 +258,8 @@ class DecoderLayer(nnx.Module):
         self_attention_masks = None
         if tgt_masks is not None:
             self_attention_masks = nnx.make_attention_mask(
-                tgt_masks, jnp.ones((batch_size, tgt_len), dtype=jnp.bool)
+                tgt_masks,
+                tgt_masks,
             )
 
         multihead_attention_masks = None

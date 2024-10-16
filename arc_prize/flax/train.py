@@ -6,7 +6,6 @@ from typing import Optional
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 import orbax.checkpoint as ocp
 from flax import nnx, struct
@@ -263,7 +262,7 @@ def train_and_evaluate(
 
             time_diff = time.perf_counter() - train_time
             print(f"Eval loop completed in {time_diff:.2f}")
-            print(f"Train loss: {eval_loss:.4f}, accuracy: {eval_accuracy:.4f}")
+            print(f"Eval loss: {eval_loss:.4f}, accuracy: {eval_accuracy:.4f}")
 
             checkpoint_mngr.save(epoch + 1, args=ocp.args.StandardSave(state))
 
