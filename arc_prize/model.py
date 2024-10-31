@@ -396,6 +396,143 @@ class ARCTransformerEncoderDecoder(nn.Module):
             )
 
 
+class ARCTransformerEncoder(nn.Module):
+    grid_dim: int
+    num_train_pairs: int
+    num_classes: int
+    num_layers: int
+    num_heads: int
+    d_model: int
+    d_ff: int
+    dropout: float
+    seq_len: int
+
+    def __init__(self, params: ARCTransformerEncoderDecoderParams):
+        super().__init__()
+        self.grid_dim = params.grid_dim
+        self.num_train_pairs = params.num_train_pairs
+        self.num_classes = params.num_colors + 1
+        self.d_model = params.d_model
+        self.num_layers = params.num_encoder_layers
+        self.num_heads = params.num_heads
+        self.d_ff = params.d_ff
+        self.dropout = params.dropout
+
+        self.input_seq_len = (
+            (self.num_train_pairs * 2 + 1) * self.grid_dim * self.grid_dim
+        )
+        self.output_seq_len = self.grid_dim * self.grid_dim
+        self.seq_len = self.input_seq_len + self.output_seq_len
+
+        self.embedding = nn.Embedding(self.num_classes, self.d_model)
+        self.pos_encoding = ARCPositionalEncoding(
+            d_model=self.d_model,
+            grid_dim=self.grid_dim,
+            num_train_pairs=self.num_train_pairs,
+        )
+
+        encoder_layer = EncoderLayerWithAttention(
+            self.d_model, self.num_heads, self.d_ff, self.dropout
+        )
+
+        self.encoder = EncoderWithAttention(encoder_layer, self.num_layers)
+        self.output_query = nn.Parameter(
+            torch.randn(1, 1, self.grid_dim, self.grid_dim, self.d_model)
+        )
+        self.output_layer = nn.Linear(self.d_model, self.num_classes)
+
+    def forward(
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
+    ) -> tuple[
+        torch.Tensor,
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+    ]:
+        batch_size = src.shape[0]
+
+        embedded_src = self.embedding.forward(src)
+
+        if tgt is not None:
+            output_query = self.embedding.forward(tgt).view(
+                batch_size, 1, self.grid_dim, self.grid_dim, self.d_model
+            )
+        else:
+            output_query = self.output_query.expand(batch_size, -1, -1, -1, -1)
+
+        combined_input = torch.cat([embedded_src, output_query], dim=1)
+
+        # Add positional encodings
+        pos_emb = self.pos_encoding(combined_input)
+        embedded = combined_input + pos_emb
+
+        embedded = embedded.view(batch_size, self.seq_len, self.d_model)
+
+        causal_mask = torch.zeros(self.seq_len, self.seq_len, device=src.device)
+        causal_mask[: self.input_seq_len, self.input_seq_len :] = 1
+        causal_mask = causal_mask.bool()
+
+        # Create padding mask
+        padding_mask = ~src_mask.view(batch_size, -1)
+
+        padding_mask = torch.cat(
+            [
+                padding_mask,
+                torch.zeros(
+                    (batch_size, self.grid_dim**2), dtype=torch.bool, device=src.device
+                ),
+            ],
+            dim=1,
+        )
+
+        output, _ = self.encoder.forward(
+            embedded, mask=causal_mask, src_key_padding_mask=padding_mask
+        )
+
+        # Get only the output grid portion
+        output_grid_portion = output[:, -self.output_seq_len :, :]
+
+        # Project to vocabulary space
+        logits = self.output_layer(output_grid_portion)
+
+        # Reshape to grid format
+        output = logits.view(batch_size, self.grid_dim, self.grid_dim, self.num_classes)
+
+        if temperature > 0:
+            output = output / temperature
+
+        return (output, None, None, None)
+
+    def generate(
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        need_weights: bool = False,
+    ) -> tuple[
+        torch.Tensor,
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+        Optional[torch.Tensor],
+    ]:
+        with torch.no_grad():
+            (
+                output,
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            ) = self.forward(src, src_mask)
+            return (
+                torch.argmax(output, dim=-1),
+                encoder_attn_weights,
+                decoder_sa_attn_weights,
+                decoder_mha_attn_weights,
+            )
+
+
 class PatchEmbedding(nn.Module):
     def __init__(
         self,
@@ -587,7 +724,12 @@ class ARCVisionEncoderDecoder(nn.Module):
 
 
 class ARCPositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, grid_dim: int, num_train_pairs: int):
+    def __init__(
+        self,
+        d_model: int,
+        grid_dim: int,
+        num_train_pairs: int,
+    ):
         super().__init__()
         self.d_model = d_model
         self.grid_dim = grid_dim

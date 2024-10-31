@@ -16,9 +16,12 @@ from arc_prize.data import (
     FinetuneDataset,
     collate_arc_fn,
     make_data_loaders,
+    make_datasets,
+    make_epoch_data_loader,
     make_finetune_dataset,
 )
 from arc_prize.model import (
+    ARCTransformerEncoder,
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
     ARCVisionEncoderDecoder,
@@ -36,6 +39,8 @@ class ARCTrainParams:
     meta_learning_rate: Optional[float] = None
     meta_weight_decay: Optional[float] = None
     meta_num_epochs: Optional[int] = None
+    train_steps_per_epoch: Optional[int] = None
+    eval_steps_per_epoch: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -91,18 +96,21 @@ def fine_tune_transformer(
 
     torch.backends.mha.set_fastpath_enabled(False)
 
+    model = copy.deepcopy(model)
     model = model.to(device)
+
+    batch_size = 4
 
     data_loader = DataLoader(
         dataset,
-        batch_size=train_params.batch_size,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_arc_fn,
         num_workers=0,
     )
 
     print(f"Starting fine-tuning run with dataset of {len(dataset)} training items")
-    print(f"Using batch size of {train_params.batch_size}")
+    print(f"Using batch size of {batch_size}")
 
     class_weights = torch.ones(model.num_classes).to(device)
     if train_params.loss_class_weights is not None:
@@ -119,7 +127,7 @@ def fine_tune_transformer(
 
     scaler = GradScaler(device.type)
 
-    num_epochs = 20
+    num_epochs = 10
 
     model.train()
 
@@ -180,6 +188,8 @@ def train_arc_transformer(
 
     if checkpoint.model_type == "vision":
         model = ARCVisionEncoderDecoder(checkpoint.model_params)
+    elif checkpoint.model_type == "encoder":
+        model = ARCTransformerEncoder(checkpoint.model_params)
     else:
         model = ARCTransformerEncoderDecoder(checkpoint.model_params)
 
@@ -200,16 +210,18 @@ def train_arc_transformer(
 
     train_params = train_params or checkpoint.train_params
 
-    train_loader, val_loader = make_data_loaders(
-        train_params.dataset_dir,
-        train_params.batch_size,
-        dataset_params,
-    )
+    train_dataset, val_dataset = make_datasets(train_params.dataset_dir, dataset_params)
+
+    # train_loader, val_loader = make_data_loaders(
+    #     train_params.dataset_dir,
+    #     train_params.batch_size,
+    #     dataset_params,
+    # )
 
     dataset_dir_names = ", ".join(train_params.dataset_dir)
 
     print(
-        f"Starting training run with dataset of {len(train_loader.dataset)} training items and {len(val_loader.dataset)} evaluation items: {dataset_dir_names}"
+        f"Starting training run with dataset of {len(train_dataset)} training items and {len(val_dataset)} evaluation items: {dataset_dir_names}"
     )
     print(f"Using batch size of {train_params.batch_size}")
 
@@ -247,6 +259,12 @@ def train_arc_transformer(
         train_accuracy = 0.0
         start_time = time.time()
 
+        train_loader = make_epoch_data_loader(
+            train_dataset,
+            train_params.batch_size,
+            num_steps=train_params.train_steps_per_epoch,
+        )
+
         for batch in train_loader:
             # grids, masks, target_grid = batch
             grids, masks, target_grid = [item.to(device) for item in batch]
@@ -260,13 +278,9 @@ def train_arc_transformer(
                     target_grid.view(-1).long(),
                 )
 
-            # Use the scaler for backpropagation and optimization
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-
-            # loss.backward()
-            # optimizer.step()
 
             train_loss += loss.item()
 
@@ -276,10 +290,15 @@ def train_arc_transformer(
         train_loss /= len(train_loader)
         train_accuracy /= len(train_loader)
 
-        # Validation
         parallel_model.eval()
         val_loss = 0.0
         val_accuracy = 0.0
+
+        val_loader = make_epoch_data_loader(
+            val_dataset,
+            train_params.batch_size,
+            num_steps=train_params.eval_steps_per_epoch,
+        )
         with torch.no_grad():
             for batch in val_loader:
                 # grids, masks, target_grid = batch
@@ -326,13 +345,13 @@ def train_arc_transformer(
             )
         )
 
-        # for batch in encoder_attn_weights:
-        #     for layer in batch:
-        #         visualize_all_heads(layer)
-
         print(f"Epoch {epoch+1}/{total_epochs} for {model_filename}:")
-        print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
-        print(f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
+        print(
+            f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Train Steps: {len(train_loader)}"
+        )
+        print(
+            f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}, Val Steps: {len(val_loader)}"
+        )
 
         duration = end_time - start_time
         print(f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)")

@@ -6,8 +6,6 @@ import numpy as np
 import seaborn as sns
 import torch
 
-from arc_prize.train import EpochState
-
 COLORS = [
     "#c2c0c0",  # padding grey
     "#111111",  # black
@@ -24,7 +22,7 @@ COLORS = [
 ]
 
 
-def visualize_epochs(epochs: dict[str, list[EpochState]]):
+def visualize_epochs(epochs: dict[str, list]):
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(15, 15), sharex=True)
 
     for k, v in epochs.items():
@@ -407,6 +405,20 @@ def visualize_mean_attention(attention_weights, num_grids=9, grid_size=10):
         # Remove ticks from the main subplot
         ax.set_xticks([])
         ax.set_yticks([])
+
+    plt.tight_layout()
+    plt.show()
+
+
+def display_grid(grid):
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    im = ax.imshow(grid, cmap="binary", interpolation="nearest")
+
+    plt.colorbar(im, ax=ax, label="Boolean value")
+
+    ax.set_xticks([])
+    ax.set_yticks([])
 
     plt.tight_layout()
     plt.show()

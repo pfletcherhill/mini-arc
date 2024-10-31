@@ -2,6 +2,7 @@ import json
 import os
 import random
 import time
+from functools import partial
 from typing import Optional
 
 import jax
@@ -10,7 +11,7 @@ import optax
 import orbax.checkpoint as ocp
 from flax import nnx, struct
 from flax.training.train_state import TrainState as FlaxTrainState
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 
 from arc_prize.data import (
     ARCDatasetParams,
@@ -25,6 +26,20 @@ from arc_prize.flax.models import (
 class TrainState(FlaxTrainState):
     graphdef: nnx.GraphDef[ARCTransformerEncoderDecoder]
     other_state: nnx.State
+
+
+# @struct.dataclass
+# class TrainState:
+#     params: nnx.GraphState
+#     other_state: nnx.GraphState
+#     opt_state: optax.OptState
+#     step: int
+
+
+@struct.dataclass
+class ModelState:
+    params: nnx.GraphState
+    other_state: nnx.GraphState
 
 
 @struct.dataclass
@@ -64,35 +79,58 @@ def loss_fn(
     return (loss, accuracy)
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=["graphdef", "tx"])
 def train_step(
-    state: TrainState,
+    graphdef: nnx.GraphDef[ARCTransformerEncoderDecoder],
+    model_state: ModelState,
+    tx: optax.GradientTransformation,
+    opt_state: optax.OptState,
     batch: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
     class_weights: jnp.ndarray,
-) -> tuple[TrainState, jnp.ndarray, jnp.ndarray]:
-    model = nnx.merge(state.graphdef, state.params, state.other_state)
+) -> tuple[ModelState, optax.OptState, jnp.ndarray, jnp.ndarray]:
+    model = nnx.merge(graphdef, model_state.params, model_state.other_state)
     model.train(decode=False)
 
     (loss, accuracy), grads = nnx.value_and_grad(loss_fn, has_aux=True)(
         model, batch, class_weights
     )
 
-    _, _, other_state = nnx.split(model, nnx.Param, ...)
+    updates, new_opt_state = tx.update(grads, opt_state, model_state.params)
+    new_params = optax.apply_updates(model_state.params, updates)
 
-    new_state = state.apply_gradients(grads=grads, other_state=other_state)
-    return (new_state, loss, accuracy)
+    _, _, new_other_state = nnx.split(model, nnx.Param, ...)
+
+    new_model_state = ModelState(params=new_params, other_state=new_other_state)
+
+    return (new_model_state, new_opt_state, loss, accuracy)
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=["graphdef"])
 def eval_step(
-    state: TrainState,
+    # state: TrainState,
+    graphdef: nnx.GraphDef[ARCTransformerEncoderDecoder],
+    model_state: ModelState,
     batch: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
     class_weights: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    model = nnx.merge(state.graphdef, state.params, state.other_state)
+    model = nnx.merge(graphdef, model_state.params, model_state.other_state)
     model.eval(decode=False)
     loss, accuracy = loss_fn(model, batch, class_weights)
     return (loss, accuracy)
+
+
+def predict_step(
+    graphdef: nnx.GraphDef,
+    params: nnx.GraphState,
+    other_state: nnx.GraphState,
+    grids: jnp.ndarray,
+    masks: jnp.ndarray,
+) -> jnp.ndarray:
+    model = nnx.merge(graphdef, params, other_state)
+    print("model", model)
+    model.eval(decode=False)
+    logits = model(grids, masks)
+    return logits
 
 
 def collate_flax_arc_fn(
@@ -155,125 +193,221 @@ def setup_train_state(
     return state
 
 
+def get_model_state(
+    model: ARCTransformerEncoderDecoder,
+) -> tuple[nnx.GraphDef[ARCTransformerEncoderDecoder], ModelState]:
+    graphdef, params, other_state = nnx.split(model, nnx.Param, ...)
+
+    def _fix_random_key(x):
+        if jax.dtypes.issubdtype(x.dtype, jax.dtypes.prng_key):
+            x = jax.random.key_data(x)
+        return x
+
+    other_state = jax.tree.map(_fix_random_key, other_state)
+
+    model_state = ModelState(params=params, other_state=other_state)
+
+    return (graphdef, model_state)
+
+
 def train_and_evaluate(
     model_dir: str,
     model_params: ARCTransformerEncoderDecoderParams,
     train_params: TrainParams,
     num_epochs: int,
+    force_restart: Optional[bool] = False,
 ):
+    checkpoint_dir = f"{model_dir}/checkpoints"
+
+    if force_restart is True:
+        ocp.test_utils.erase_and_create_empty(checkpoint_dir)
+
     checkpoint_options = ocp.CheckpointManagerOptions()
-    with ocp.CheckpointManager(
-        ocp.test_utils.erase_and_create_empty(f"{model_dir}/checkpoints"),
-        options=checkpoint_options,
-    ) as checkpoint_mngr:
-        # os.makedirs(workdir, exist_ok=True)
-        print("GPU devices", jax.devices())
 
-        dataset_params = ARCDatasetParams(
-            max_grid_size=model_params.grid_dim,
-            max_train_grids=model_params.num_train_pairs,
-            color_offset=1,
+    checkpoint_mngr = ocp.CheckpointManager(checkpoint_dir, options=checkpoint_options)
+
+    epoch = checkpoint_mngr.latest_step()
+    print("Latest step", epoch)
+
+    # os.makedirs(workdir, exist_ok=True)
+    print("GPU devices", jax.devices())
+
+    dataset_params = ARCDatasetParams(
+        max_grid_size=model_params.grid_dim,
+        max_train_grids=model_params.num_train_pairs,
+        color_offset=1,
+    )
+
+    train_dataset, val_dataset = make_datasets(
+        train_params.dataset_dirs,
+        dataset_params,
+    )
+
+    dataset_dir_names = ", ".join(train_params.dataset_dirs)
+
+    print(
+        f"Starting training run with dataset of {len(train_dataset)} training items and {len(val_dataset)} evaluation items: {dataset_dir_names}"
+    )
+    print(f"Using batch size of {train_params.batch_size}")
+
+    rngs = nnx.Rngs(0)
+
+    model = ARCTransformerEncoderDecoder(params=model_params, rngs=rngs)
+    graphdef, model_state = get_model_state(model)
+
+    warmup_lr_schedule = optax.schedules.warmup_constant_schedule(
+        0, train_params.learning_rate, warmup_steps=train_params.warmup_steps
+    )
+    # plateau_lr_reducer = optax.contrib.reduce_on_plateau(factor=0.1, patience=5)
+
+    optimizer = optax.chain(
+        optax.adamw(
+            learning_rate=warmup_lr_schedule,
+            weight_decay=train_params.weight_decay,
         )
+    )
 
-        train_dataset, val_dataset = make_datasets(
-            train_params.dataset_dirs,
-            dataset_params,
-        )
+    opt_state = optimizer.init(model_state.params)
 
-        dataset_dir_names = ", ".join(train_params.dataset_dirs)
-
-        print(
-            f"Starting training run with dataset of {len(train_dataset)} training items and {len(val_dataset)} evaluation items: {dataset_dir_names}"
-        )
-        print(f"Using batch size of {train_params.batch_size}")
-
-        rngs = nnx.Rngs(0)
-
-        model = ARCTransformerEncoderDecoder(params=model_params, rngs=rngs)
-
-        warmup_lr_schedule = optax.schedules.warmup_constant_schedule(
-            0, train_params.learning_rate, warmup_steps=train_params.warmup_steps
-        )
-        # plateau_lr_reducer = optax.contrib.reduce_on_plateau(factor=0.1, patience=5)
-
-        optimizer = optax.chain(
-            optax.adamw(
-                learning_rate=warmup_lr_schedule,
-                weight_decay=train_params.weight_decay,
+    if epoch is not None:
+        restored_args = checkpoint_mngr.restore(
+            epoch,
+            args=ocp.args.Composite(
+                model_state=ocp.args.StandardRestore(item=model_state),
+                opt_state=ocp.args.StandardRestore(item=opt_state),
             ),
         )
+        model_state: ModelState = restored_args["model_state"]
+        opt_state: optax.OptState = restored_args["opt_state"]
 
-        class_weights = jnp.ones(model.num_classes)
-        if train_params.loss_class_weights is not None:
-            for cls, weight in train_params.loss_class_weights.items():
-                class_weights = class_weights.at[int(cls)].set(weight)
+    class_weights = jnp.ones(model.num_classes)
+    if train_params.loss_class_weights is not None:
+        for cls, weight in train_params.loss_class_weights.items():
+            class_weights = class_weights.at[int(cls)].set(weight)
 
-        state = setup_train_state(model, optimizer)
+    total_epochs = (epoch or 0) + num_epochs
+    for epoch in range(epoch or 0, total_epochs):
+        print(f"Starting epoch {epoch + 1}/{total_epochs}")
+        start_time = time.perf_counter()
 
-        checkpoint_mngr.save(0, args=ocp.args.StandardSave(state))
+        train_loss = 0.0
+        train_accuracy = 0.0
+        train_data_loader = get_epoch_data_loader(
+            train_dataset,
+            train_params.batch_size,
+            num_steps=train_params.train_steps_per_epoch,
+        )
+        for batch in train_data_loader:
+            model_state, opt_state, loss, accuracy = train_step(
+                graphdef, model_state, optimizer, opt_state, batch, class_weights
+            )
+            train_loss += loss.item()
+            train_accuracy += accuracy.item()
+        train_loss /= len(train_data_loader)
+        train_accuracy /= len(train_data_loader)
+
+        train_time = time.perf_counter()
+
+        print(
+            f"Train loss (completed in {(train_time - start_time):.2f}s): {train_loss:.4f}, accuracy: {train_accuracy:.4f}"
+        )
+
+        eval_loss = 0.0
+        eval_accuracy = 0.0
+        eval_data_loader = get_epoch_data_loader(
+            val_dataset,
+            train_params.batch_size,
+            num_steps=train_params.eval_steps_per_epoch,
+        )
+        for batch in eval_data_loader:
+            loss, accuracy = eval_step(graphdef, model_state, batch, class_weights)
+            eval_loss += loss.item()
+            eval_accuracy += accuracy.item()
+        eval_loss /= len(eval_data_loader)
+        eval_accuracy /= len(eval_data_loader)
+
+        time_diff = time.perf_counter() - train_time
+
+        print(
+            f"Eval loss (competed in {time_diff:.2f}s): {eval_loss:.4f}, accuracy: {eval_accuracy:.4f}"
+        )
+
+        checkpoint_mngr.save(
+            epoch,
+            args=ocp.args.Composite(
+                model_state=ocp.args.StandardSave(item=model_state),
+                opt_state=ocp.args.StandardSave(item=opt_state),
+            ),
+        )
         checkpoint_mngr.wait_until_finished()
 
-        # checkpoint_mngr.restore(checkpoint_mngr.latest_step(), state)
-        # print(restored_state_dict.keys())
-        # restored_train_state = TrainState.create(
-        #     tx=optimizer,
-        #     apply_fn=restored_state_dict["graphdef"]["apply"],
-        #     **restored_state_dict,
-        # )
-        # print(restored_train_state)
-        # nnx.update(model, restored_state.params)
-
-        for epoch in range(num_epochs):
-            print(f"Starting epoch {epoch + 1}/{num_epochs}")
-            start_time = time.perf_counter()
-            # model.set_attributes(deterministic=False, decode=False)
-            train_loss = 0.0
-            train_accuracy = 0.0
-            train_data_loader = get_epoch_data_loader(
-                train_dataset,
-                train_params.batch_size,
-                num_steps=train_params.train_steps_per_epoch,
-            )
-            for batch in train_data_loader:
-                state, loss, accuracy = train_step(state, batch, class_weights)
-                train_loss += loss.item()
-                train_accuracy += accuracy.item()
-            train_loss /= len(train_data_loader)
-            train_accuracy /= len(train_data_loader)
-
-            train_time = time.perf_counter()
-            print(f"Train loop completed in {(train_time - start_time):.2f}s")
-            print(f"Train loss: {train_loss:.4f}, accuracy: {train_accuracy:.4f}")
-
-            # model.set_attributes(deterministic=True, decode=False)
-            eval_loss = 0.0
-            eval_accuracy = 0.0
-            eval_data_loader = get_epoch_data_loader(
-                val_dataset,
-                train_params.batch_size,
-                num_steps=train_params.eval_steps_per_epoch,
-            )
-            for batch in eval_data_loader:
-                loss, accuracy = eval_step(state, batch, class_weights)
-                eval_loss += loss.item()
-                eval_accuracy += accuracy.item()
-            eval_loss /= len(eval_data_loader)
-            eval_accuracy /= len(eval_data_loader)
-
-            time_diff = time.perf_counter() - train_time
-            print(f"Eval loop completed in {time_diff:.2f}")
-            print(f"Eval loss: {eval_loss:.4f}, accuracy: {eval_accuracy:.4f}")
-
-            checkpoint_mngr.save(epoch + 1, args=ocp.args.StandardSave(state))
+    checkpoint_mngr.close()
 
 
-def train_and_evaluate_local(
+def predict(
     model_dir: str,
-    num_epochs: int,
+    model_params: ARCTransformerEncoderDecoderParams,
+    dataset_dir: str,
+    num_steps: Optional[int] = None,
+):
+    checkpoint_options = ocp.CheckpointManagerOptions(read_only=True)
+    checkpoint_mngr = ocp.CheckpointManager(
+        f"{model_dir}/checkpoints",
+        options=checkpoint_options,
+    )
+    # os.makedirs(workdir, exist_ok=True)
+    print("GPU devices", jax.devices())
+
+    dataset_params = ARCDatasetParams(
+        max_grid_size=model_params.grid_dim,
+        max_train_grids=model_params.num_train_pairs,
+        color_offset=1,
+    )
+
+    train_dataset, val_dataset = make_datasets(
+        [dataset_dir],
+        dataset_params,
+    )
+    dataset = ConcatDataset([train_dataset, val_dataset])
+
+    rngs = nnx.Rngs(0)
+
+    model = ARCTransformerEncoderDecoder(params=model_params, rngs=rngs)
+
+    print("latest step", checkpoint_mngr.latest_step())
+    checkpoint_mngr.restore(
+        checkpoint_mngr.latest_step(), args=ocp.args.PyTreeRestore()
+    )
+
+    print("graphdef", restored_state["graphdef"])
+    print("keys", restored_state.keys())
+
+    data_loader = get_epoch_data_loader(dataset, 1, num_steps)
+
+    output = []
+
+    for batch in data_loader:
+        grids, masks, targets = batch
+        logits = predict_step(
+            restored_state["graphdef"],
+            restored_state["params"],
+            restored_state["other_state"],
+            grids,
+            masks,
+        )
+        predictions = jnp.argmax(logits, axis=-1)
+        print("logits", logits, predictions)
+        output.append({"grids": grids, "targets": targets, "predictions": predictions})
+
+    checkpoint_mngr.close()
+    return output
+
+
+def get_config_params(
+    model_dir: str,
     model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
     train_params: Optional[TrainParams] = None,
-):
-    os.makedirs(model_dir, exist_ok=True)
+) -> tuple[ARCTransformerEncoderDecoderParams, TrainParams]:
     config_path = f"{model_dir}/config.json"
 
     if os.path.isfile(config_path):
@@ -287,7 +421,34 @@ def train_and_evaluate_local(
 
     assert model_params is not None and train_params is not None
 
+    return (model_params, train_params)
+
+
+def save_config_params(
+    model_dir: str,
+    model_params: ARCTransformerEncoderDecoderParams,
+    train_params: TrainParams,
+) -> None:
     with open(f"{model_dir}/config.json", "w") as f:
         config_dict = {"model": model_params.__dict__, "train": train_params.__dict__}
         json.dump(config_dict, f)
-    return train_and_evaluate(model_dir, model_params, train_params, num_epochs)
+
+
+def train_and_evaluate_local(
+    model_dir: str,
+    num_epochs: int,
+    model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
+    train_params: Optional[TrainParams] = None,
+    force_restart: Optional[bool] = False,
+):
+    os.makedirs(model_dir, exist_ok=True)
+
+    model_params, train_params = get_config_params(
+        model_dir, model_params, train_params
+    )
+
+    save_config_params(model_dir, model_params, train_params)
+
+    return train_and_evaluate(
+        model_dir, model_params, train_params, num_epochs, force_restart
+    )

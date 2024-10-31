@@ -11,6 +11,7 @@ from arc_prize.data import (
 )
 from arc_prize.meta import meta_fine_tune_transformer, meta_train_arc_transformer
 from arc_prize.model import (
+    ARCTransformerEncoder,
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
     ARCVisionEncoderDecoder,
@@ -75,6 +76,8 @@ def finetune_and_predict(
 
     if checkpoint.model_type == "vision":
         model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
+    elif checkpoint.model_type == "encoder":
+        model = ARCTransformerEncoder(checkpoint.model_params).to(device)
     else:
         model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
 

@@ -2,10 +2,10 @@ import itertools
 import json
 import random
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset, random_split
 
 
 @dataclass(frozen=True)
@@ -434,3 +434,32 @@ def make_re_arc_data_loaders(
     )
 
     return (train_loader, val_loader)
+
+
+def make_epoch_data_loader(
+    dataset: Dataset,
+    batch_size: int,
+    collate_fn: Optional[Callable] = None,
+    num_steps: Optional[int] = None,
+):
+    total_samples = len(dataset)
+    subset = None
+
+    if num_steps is not None:
+        num_samples = num_steps * batch_size
+
+        assert num_samples <= total_samples
+
+        indices = random.sample(range(total_samples), num_samples)
+
+        subset = Subset(dataset, indices)
+
+    loader = DataLoader(
+        subset or dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=(collate_fn or collate_arc_fn),
+        num_workers=0,
+    )
+
+    return loader
