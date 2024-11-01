@@ -495,7 +495,7 @@ class ARCTransformerEncoder(nn.Module):
 
         output = self.encoder.forward(
             embedded, mask=causal_mask, src_key_padding_mask=padding_mask
-        )
+        )[0]
 
         # Get only the output grid portion
         output_grid_portion = output[:, -self.output_seq_len :, :]

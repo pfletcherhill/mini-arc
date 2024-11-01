@@ -181,7 +181,6 @@ def train_arc_transformer(
 ) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_compilation = force_compile or device.type == "cuda"
-    # use_compilation = False  # Fix later
 
     use_distributed = torch.cuda.device_count() > 0 and local_rank is not None
     local_rank = local_rank if use_distributed else 0
@@ -208,7 +207,7 @@ def train_arc_transformer(
 
     if use_compilation:
         try:
-            model = torch.compile(model, mode="default", dynamic=True, fullgraph=True)
+            model = torch.compile(model, mode="default")
             print("Successfully compiled model")
         except Exception as e:
             print(
