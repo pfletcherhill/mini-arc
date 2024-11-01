@@ -1,7 +1,10 @@
+import os
 from typing import Optional
 
 import modal
 import torch
+import torch.distributed as dist
+from torch.multiprocessing.spawn import spawn
 from torch.utils.data import ConcatDataset
 
 from arc_prize.data import (
@@ -31,6 +34,28 @@ models_volume = modal.Volume.from_name("arc-model-vol", create_if_missing=True)
 data_volume = modal.Volume.from_name("arc-data")
 
 
+def train_process(
+    rank: int,
+    world_size: int,
+    model_filename: str,
+    num_epochs: int,
+    train_params: Optional[ARCTrainParams] = None,
+):
+    print(f"Starting process rank={rank}, world_size={world_size}", flush=True)
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+    try:
+        train_arc_transformer(
+            model_filename=model_filename,
+            num_epochs=num_epochs,
+            train_params=train_params,
+            local_rank=rank,
+        )
+    finally:
+        print(f"Shutting down process rank={rank}", flush=True)
+        dist.destroy_process_group()
+
+
 @modal_app.function(
     gpu="A100:2",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
@@ -58,7 +83,21 @@ def train(
         )
         torch.save(model_state.__dict__, model_filename)
 
-    return train_arc_transformer(model_filename, num_epochs, train_params=train_params)
+    world_size = torch.cuda.device_count()
+    print(f"Starting distributed training across {world_size} GPUs")
+
+    port = 12355
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(port)
+
+    print(f"Using port {port} for distributed training")
+
+    return spawn(
+        train_process,
+        args=(world_size, model_filename, num_epochs, train_params),
+        nprocs=world_size,
+        join=True,
+    )
 
 
 @modal_app.function(volumes={"/vol/models": models_volume})

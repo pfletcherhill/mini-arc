@@ -1,11 +1,21 @@
 import itertools
 import json
+import math
 import random
 from dataclasses import dataclass
-from typing import Callable, Optional
+from operator import itemgetter
+from typing import Callable, Iterator, Optional
 
 import torch
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset, random_split
+from torch.utils.data import (
+    ConcatDataset,
+    DataLoader,
+    Dataset,
+    DistributedSampler,
+    Sampler,
+    Subset,
+    random_split,
+)
 
 
 @dataclass(frozen=True)
@@ -441,6 +451,7 @@ def make_epoch_data_loader(
     batch_size: int,
     collate_fn: Optional[Callable] = None,
     num_steps: Optional[int] = None,
+    sampler: Optional[DistributedSampler] = None,
 ):
     total_samples = len(dataset)
     subset = None
@@ -460,6 +471,72 @@ def make_epoch_data_loader(
         shuffle=True,
         collate_fn=(collate_fn or collate_arc_fn),
         num_workers=0,
+        sampler=sampler,
     )
 
     return loader
+
+
+class DistributedRandomSampler(DistributedSampler):
+    """
+    Combines DistributedSampler and RandomSampler functionality.
+    Allows sampling a specific number of samples randomly while maintaining distributed properties.
+    """
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        num_samples: Optional[int] = None,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        shuffle: bool = True,
+        seed: int = 0,
+        drop_last: bool = False,
+    ) -> None:
+        """
+        Args:
+            dataset: Dataset to sample from
+            num_samples: Number of samples to draw (per replica). If None, samples whole dataset
+            num_replicas: Number of processes participating in distributed training
+            rank: Rank of the current process
+            shuffle: If True, sampler will shuffle the indices
+            seed: Random seed for reproducibility
+            drop_last: If True, drops the last non-full batch
+        """
+        super().__init__(dataset, num_replicas, rank, shuffle, seed, drop_last)
+
+        # Calculate number of samples per replica
+        if num_samples is not None:
+            self.num_samples = num_samples
+            self.total_size = self.num_samples * self.num_replicas
+
+    def __iter__(self) -> Iterator[int]:
+        g = torch.Generator()
+        g.manual_seed(self.seed + self.epoch)
+
+        n = len(self.dataset)
+
+        # Without replacement: shuffle and repeat if necessary
+        if self.shuffle:
+            # Generate permutation of all indices
+            indices = []
+            for _ in range(math.ceil(self.total_size / n)):
+                indices.extend(torch.randperm(n, generator=g).tolist())
+            indices = indices[: self.total_size]
+        else:
+            # Use sequential indices and repeat if necessary
+            indices = list(range(n))
+            if self.total_size > n:
+                indices = indices * math.ceil(self.total_size / n)
+            indices = indices[: self.total_size]
+
+        assert len(indices) == self.total_size
+
+        # Distribute indices across replicas
+        indices = indices[self.rank : self.total_size : self.num_replicas]
+        assert len(indices) == self.num_samples
+
+        return iter(indices)
+
+    def __len__(self) -> int:
+        return self.num_samples

@@ -436,6 +436,10 @@ class ARCTransformerEncoder(nn.Module):
         )
 
         self.encoder = EncoderWithAttention(encoder_layer, self.num_layers)
+        # encoder_layer = nn.TransformerEncoderLayer(
+        #     self.d_model, self.num_heads, self.d_ff, self.dropout, batch_first=True
+        # )
+        # self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
         self.output_query = nn.Parameter(
             torch.randn(1, 1, self.grid_dim, self.grid_dim, self.d_model)
         )
@@ -489,7 +493,7 @@ class ARCTransformerEncoder(nn.Module):
             dim=1,
         )
 
-        output, _ = self.encoder.forward(
+        output = self.encoder.forward(
             embedded, mask=causal_mask, src_key_padding_mask=padding_mask
         )
 
