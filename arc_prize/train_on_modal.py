@@ -57,7 +57,7 @@ def train_process(
 
 
 @modal_app.function(
-    gpu="A100:2",
+    gpu="a100-80gb:2",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60 * 24),
 )
@@ -104,8 +104,9 @@ def train(
 def get_model(model_name: str):
     model_filename = f"/vol/models/{model_name}.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(model_filename, map_location=device)
-    return checkpoint
+    checkpoint_dict = torch.load(model_filename, map_location=device)
+    keys = ["model_params", "model_type", "train_params", "epochs", "best_val_loss"]
+    return {k: checkpoint_dict[k] for k in keys}
 
 
 @modal_app.function(

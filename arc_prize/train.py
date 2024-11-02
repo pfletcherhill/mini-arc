@@ -22,6 +22,7 @@ from arc_prize.model import (
     ARCTransformerEncoder,
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
+    ARCVisionEncoder,
     ARCVisionEncoderDecoder,
 )
 
@@ -39,6 +40,7 @@ class ARCTrainParams:
     meta_num_epochs: Optional[int] = None
     train_steps_per_epoch: Optional[int] = None
     eval_steps_per_epoch: Optional[int] = None
+    warmup_steps: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -195,6 +197,8 @@ def train_arc_transformer(
 
     if checkpoint.model_type == "vision":
         model = ARCVisionEncoderDecoder(checkpoint.model_params)
+    elif checkpoint.model_type == "vision_encoder":
+        model = ARCVisionEncoder(checkpoint.model_params)
     elif checkpoint.model_type == "encoder":
         model = ARCTransformerEncoder(checkpoint.model_params)
     else:
@@ -225,6 +229,9 @@ def train_arc_transformer(
     compiled_model = model
 
     base_model = model.module if hasattr(model, "module") else model
+    base_model = (
+        base_model._orig_mod if hasattr(base_model, "_orig_mod") else base_model
+    )
     shapes = {
         "grid_dim": base_model.grid_dim,
         "num_train_pairs": base_model.num_train_pairs,
@@ -306,9 +313,20 @@ def train_arc_transformer(
 
     scaler = GradScaler(device.type)
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    plateau_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=5
     )
+    if train_params.warmup_steps is not None:
+        warmup_scheduler = optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=0.1, total_iters=train_params.warmup_steps
+        )
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, plateau_scheduler],
+            milestones=[train_params.warmup_steps],
+        )
+    else:
+        scheduler = plateau_scheduler
 
     def forward_pass(model: nn.Module, grids: torch.Tensor, masks: torch.Tensor):
         output = model(grids, masks)
@@ -448,12 +466,6 @@ def train_arc_transformer(
             duration = end_time - start_time
             print(
                 f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)", flush=True
-            )
-
-            base_model = (
-                compiled_model.module
-                if hasattr(compiled_model, "module")
-                else compiled_model
             )
 
             # Save the best model
