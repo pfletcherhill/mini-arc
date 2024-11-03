@@ -1,0 +1,11 @@
+- For the puzzle, pick a frame height (2-4px) and width (12-20px).
+- For the puzzle, pick a border color, which can be any color other than the background color.
+- For each pair, pick a number of frames, which can be 4-5.
+- For each pair, come up with a transformation and make a frame where the transformation is applied sequentially in each one. Here are the transformations to choose from:
+  - Add a shape sized 1x1px to 3x3px (doesn't have to be square) and color each pixel in the shape one of two colors. Move the shape from left to right, shifting 1-2px at a time.
+  - Extend a line from left to right, getting 1-2px longer every frame. The line can have height from 1px to the height of the frame. It should grow the same amount each frame.
+  - Draw a pixel pattern, like a checkerboard, zigzag, or random pixels over the whole frame in one color. Color the left 1-3px columns of the pattern to another color, and color 1-3px more every frame. The number of columns colored each frame should be the same.
+- For each pair, the input grid will show all of these frames in order except the last. The output grid will show the last frame.
+- Each input grid will stack the frames vertically and have a 1px border in between each frame, so the input grid height should be equal to (number of frames - 1)  * frame height + (number of frames - 2), so there should be number of frames stacked on top of each other with a 1px border in between. The input grid width is the same as the frame width.
+- Each output grid should be the same dimension as a single frame and should render the final frame in the sequence for that pair.
+

@@ -1,4 +1,5 @@
 import copy
+import random
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -40,7 +41,8 @@ class ARCTrainParams:
     meta_num_epochs: Optional[int] = None
     train_steps_per_epoch: Optional[int] = None
     eval_steps_per_epoch: Optional[int] = None
-    warmup_steps: Optional[int] = None
+    warmup_epochs: Optional[int] = None
+    refinement_ratio: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -173,6 +175,22 @@ def fine_tune_transformer(
     return model
 
 
+def create_noisy_tgt(
+    tgt: torch.Tensor, noise_ratio: float, num_classes: int
+) -> torch.Tensor:
+    batch_size, grid_dim, grid_dim = tgt.shape
+    mask = torch.rand(batch_size, grid_dim, grid_dim, device=tgt.device) < noise_ratio
+
+    noisy_target = tgt.clone()
+    noise_mask = ~mask
+    random_values = torch.randint(
+        0, num_classes, tgt.shape, device=tgt.device, dtype=tgt.dtype
+    )
+    noisy_target[noise_mask] = random_values[noise_mask]
+
+    return noisy_target
+
+
 def train_arc_transformer(
     model_filename: str,
     num_epochs: int,
@@ -221,7 +239,9 @@ def train_arc_transformer(
     if use_distributed:
         from torch.nn.parallel import DistributedDataParallel
 
-        model = DistributedDataParallel(model, device_ids=[local_rank])
+        model = DistributedDataParallel(
+            model, device_ids=[local_rank], find_unused_parameters=True
+        )
         print(f"Using DistributedDataParallel on GPU {local_rank}", flush=True)
     else:
         print(f"Using single {'GPU' if device.type == 'cuda' else 'CPU'}")
@@ -301,8 +321,10 @@ def train_arc_transformer(
     if train_params.loss_class_weights is not None:
         for cls, weight in train_params.loss_class_weights.items():
             class_weights[cls] = weight
-
     criterion = nn.CrossEntropyLoss(weight=class_weights)
+
+    epoch = len(checkpoint.epochs)
+
     optimizer = optim.AdamW(
         compiled_model.parameters(),
         lr=train_params.learning_rate,
@@ -316,20 +338,34 @@ def train_arc_transformer(
     plateau_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=5
     )
-    if train_params.warmup_steps is not None:
+    if train_params.warmup_epochs is not None:
         warmup_scheduler = optim.lr_scheduler.LinearLR(
-            optimizer, start_factor=0.1, total_iters=train_params.warmup_steps
-        )
-        scheduler = optim.lr_scheduler.SequentialLR(
             optimizer,
-            schedulers=[warmup_scheduler, plateau_scheduler],
-            milestones=[train_params.warmup_steps],
+            start_factor=0.1,
+            total_iters=train_params.warmup_epochs,
+            last_epoch=(epoch - 1),
         )
     else:
-        scheduler = plateau_scheduler
+        warmup_scheduler = None
 
-    def forward_pass(model: nn.Module, grids: torch.Tensor, masks: torch.Tensor):
-        output = model(grids, masks)
+    def update_scheduler(epoch: int, loss: float):
+        if (
+            train_params.warmup_epochs is not None
+            and warmup_scheduler is not None
+            and epoch <= train_params.warmup_epochs
+        ):
+            warmup_scheduler.step()
+
+        else:
+            plateau_scheduler.step(loss)
+
+    def forward_pass(
+        model: nn.Module,
+        grids: torch.Tensor,
+        masks: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+    ):
+        output = model.forward(grids, masks, tgt=tgt)
         return output[0] if isinstance(output, tuple) else output
 
     def training_step(
@@ -338,8 +374,19 @@ def train_arc_transformer(
         masks: torch.Tensor,
         target_grid: torch.Tensor,
     ):
+        do_refinement = (
+            train_params.refinement_ratio is not None
+            and random.random() < train_params.refinement_ratio
+        )
+        if do_refinement:
+            refinement_noise_ratio = random.uniform(0.0, 0.6)
+            tgt = create_noisy_tgt(
+                target_grid, refinement_noise_ratio, shapes["num_classes"]
+            )
+        else:
+            tgt = None
         with autocast(device.type):
-            output = forward_pass(model, grids, masks)
+            output = forward_pass(model, grids, masks, tgt=tgt)
             loss = criterion(
                 output.view(-1, shapes["num_classes"]),
                 target_grid.view(-1).long(),
@@ -354,8 +401,19 @@ def train_arc_transformer(
         masks: torch.Tensor,
         target_grid: torch.Tensor,
     ):
+        do_refinement = (
+            train_params.refinement_ratio is not None
+            and random.random() < train_params.refinement_ratio
+        )
+        if do_refinement:
+            refinement_noise_ratio = random.uniform(0.0, 0.6)
+            tgt = create_noisy_tgt(
+                target_grid, refinement_noise_ratio, shapes["num_classes"]
+            )
+        else:
+            tgt = None
         with autocast(device.type):
-            output = forward_pass(model, grids, masks)
+            output = forward_pass(model, grids, masks, tgt=tgt)
             loss = criterion(
                 output.view(-1, shapes["num_classes"]),
                 target_grid.view(-1).long(),
@@ -368,10 +426,10 @@ def train_arc_transformer(
         torch.save(checkpoint.__dict__, model_filename)
         print("Saved checkpoint", model_filename, flush=True)
 
-    total_epochs = len(checkpoint.epochs) + num_epochs
+    total_epochs = epoch + num_epochs
     epochs_without_improvement = 0
 
-    for epoch in range(len(checkpoint.epochs), total_epochs):
+    for epoch in range(epoch, total_epochs):
         train_sampler.set_epoch(epoch)
         compiled_model.train()
         train_loss = 0.0
@@ -426,9 +484,6 @@ def train_arc_transformer(
             val_metrics /= dist.get_world_size()
             val_loss, val_accuracy = val_metrics.tolist()
 
-        # Learning rate scheduling
-        scheduler.step(val_loss)
-
         param_group = optimizer.param_groups[0]
         beta1, beta2 = param_group["betas"]
 
@@ -454,6 +509,7 @@ def train_arc_transformer(
             )
 
             print(f"Epoch {epoch+1}/{total_epochs} for {model_filename}:", flush=True)
+            print(f"LR: {param_group['lr']}", flush=True)
             print(
                 f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Train Steps: {len(train_loader)}",
                 flush=True,
@@ -488,6 +544,9 @@ def train_arc_transformer(
                 flush=True,
             )
             break
+
+        # Learning rate scheduling
+        update_scheduler(epoch, val_loss)
 
     print("Training completed")
 

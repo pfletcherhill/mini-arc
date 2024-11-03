@@ -734,6 +734,7 @@ class ARCVisionEncoder(nn.Module):
             patch_size=self.patch_size,
             embed_dim=self.d_model,
         )
+        self.tgt_embedding = nn.Embedding(self.num_classes, self.d_model)
         self.pos_encoding = ARCPositionalEncodingV2(
             d_model=self.d_model,
             grid_dim=self.grid_dim,
@@ -780,12 +781,12 @@ class ARCVisionEncoder(nn.Module):
         input_pos_emb_patched = input_pos_emb_patched.reshape(-1, self.d_model)
         input_seq = src_patched + input_pos_emb_patched
 
-        # if tgt is not None:
-        #     output_query = self.embedding.forward(tgt).view(
-        #         batch_size, 1, self.grid_dim, self.grid_dim, self.d_model
-        #     )
-        # else:
-        output_query = self.output_query.expand(batch_size, -1, -1, -1, -1)
+        if tgt is not None:
+            output_query = self.tgt_embedding.forward(tgt).view(
+                batch_size, 1, self.grid_dim, self.grid_dim, self.d_model
+            )
+        else:
+            output_query = self.output_query.expand(batch_size, -1, -1, -1, -1)
         output_pos_emb = pos_emb[-1:, :, :, :]
 
         output_query = output_query.reshape(batch_size, -1, self.d_model)

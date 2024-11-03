@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>332efdb3</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be inserted here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Pick background color (black for 60% of puzzles)
+      const useBlackBackground = Math.random() < 0.6;
+      let backgroundColor;
+      if (useBlackBackground) {
+        backgroundColor = "#111111";
+      } else {
+        const colorsWithoutBlack = colors.filter(
+          (color) => color !== "#111111"
+        );
+        backgroundColor =
+          colorsWithoutBlack[
+            Math.floor(Math.random() * colorsWithoutBlack.length)
+          ];
+      }
+
+      // Pick fill color (excluding background color)
+      const colorsWithoutBackground = colors.filter(
+        (color) => color !== backgroundColor
+      );
+      const fillColor =
+        colorsWithoutBackground[
+          Math.floor(Math.random() * colorsWithoutBackground.length)
+        ];
+
+      // Pick line width (1-2px)
+      const lineWidth = Math.floor(Math.random() * 2) + 1;
+
+      // Pick line gap (1-2px)
+      const lineGap = Math.floor(Math.random() * 2) + 1;
+
+      // Pick number of pairs (2-5)
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+
+      const mainElement = document.querySelector("main");
+
+      for (let i = 1; i <= numPairs; i++) {
+        // Create pair element
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+
+        const inputGrid = document.createElement("div");
+        inputGrid.id = "input-" + i;
+        inputGrid.className = "grid";
+
+        // Set size of grid
+        const gridSize = Math.floor(Math.random() * 16) + 5; // 5 to 20
+        inputGrid.style.width = gridSize + "px";
+        inputGrid.style.height = gridSize + "px";
+
+        // Set background color
+        inputGrid.style.backgroundColor = backgroundColor;
+
+        inputContainer.appendChild(inputGrid);
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+
+        const outputGrid = document.createElement("div");
+        outputGrid.id = "output-" + i;
+        outputGrid.className = "grid";
+
+        // Set size of grid
+        outputGrid.style.width = gridSize + "px";
+        outputGrid.style.height = gridSize + "px";
+
+        // Set background color
+        outputGrid.style.backgroundColor = backgroundColor;
+
+        // Apply the checkered pattern
+        outputGrid.style.backgroundImage =
+          "repeating-linear-gradient(to bottom, " +
+          fillColor +
+          ", " +
+          fillColor +
+          " " +
+          lineWidth +
+          "px, transparent " +
+          lineWidth +
+          "px, transparent " +
+          (lineWidth + lineGap) +
+          "px), repeating-linear-gradient(to right, " +
+          fillColor +
+          ", " +
+          fillColor +
+          " " +
+          lineWidth +
+          "px, transparent " +
+          lineWidth +
+          "px, transparent " +
+          (lineWidth + lineGap) +
+          "px)";
+
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        mainElement.appendChild(pairDiv);
+      }
+    </script>
+  </body>
+</html>

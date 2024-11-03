@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4364c1c4</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be added here via JavaScript -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const main = document.querySelector("main");
+        const numPairs = Math.floor(Math.random() * 4) + 2; // Random number between 2 and 5
+
+        // Randomly decide shift amount (1px or 2px)
+        const shiftAmount = Math.random() < 0.5 ? 1 : 2;
+
+        for (let i = 1; i <= numPairs; i++) {
+          // Create the pair div
+          const pair = document.createElement("div");
+          pair.className = "pair";
+
+          // Create the containers and grids
+          const containerInput = document.createElement("div");
+          containerInput.className = "container";
+          const gridInput = document.createElement("div");
+          gridInput.id = `input-${i}`;
+          gridInput.className = "grid";
+
+          const containerOutput = document.createElement("div");
+          containerOutput.className = "container";
+          const gridOutput = document.createElement("div");
+          gridOutput.id = `output-${i}`;
+          gridOutput.className = "grid";
+
+          // Append grids to containers
+          containerInput.appendChild(gridInput);
+          containerOutput.appendChild(gridOutput);
+
+          // Append containers to pair
+          pair.appendChild(containerInput);
+          pair.appendChild(containerOutput);
+
+          // Append pair to main
+          main.appendChild(pair);
+
+          // Now, set up the grids according to the puzzle instructions
+
+          // 1. Determine grid size between 12x12px and 20x20px
+          const gridWidth = Math.floor(Math.random() * 9) + 12; // Random between 12 and 20
+          const gridHeight = Math.floor(Math.random() * 9) + 12; // Random between 12 and 20
+
+          gridInput.style.width = gridWidth + "px";
+          gridInput.style.height = gridHeight + "px";
+
+          gridOutput.style.width = gridWidth + "px";
+          gridOutput.style.height = gridHeight + "px";
+
+          // 2. Pick a random background color for the grids
+          const bgColor = colors[Math.floor(Math.random() * colors.length)];
+
+          gridInput.style.backgroundColor = bgColor;
+          gridOutput.style.backgroundColor = bgColor;
+
+          // 3. For each input grid, add 1-3 rectangles
+          const numRectangles = Math.floor(Math.random() * 3) + 1; // Random between 1 and 3
+
+          const rectangles = [];
+
+          let attempts = 0;
+          while (rectangles.length < numRectangles && attempts < 1000) {
+            attempts++;
+
+            // Determine rectangle size between 3x3 and 9x9 px
+            const rectWidth = Math.floor(Math.random() * 7) + 3; // 3-9
+            const rectHeight = Math.floor(Math.random() * 7) + 3; // 3-9
+
+            // Random position within grid, ensuring it fits within grid boundaries
+            const maxLeft = gridWidth - rectWidth;
+            const maxTop = gridHeight - rectHeight;
+
+            if (maxLeft < 0 || maxTop < 0) {
+              continue; // Rectangle size too big for grid
+            }
+
+            const rectLeft = Math.floor(Math.random() * (maxLeft + 1));
+            const rectTop = Math.floor(Math.random() * (maxTop + 1));
+
+            // Check for overlap with existing rectangles, including 4px padding
+            let overlap = false;
+            for (let rect of rectangles) {
+              if (
+                rectLeft + rectWidth + 4 > rect.left &&
+                rectLeft < rect.left + rect.width + 4 &&
+                rectTop + rectHeight + 4 > rect.top &&
+                rectTop < rect.top + rect.height + 4
+              ) {
+                overlap = true;
+                break;
+              }
+            }
+
+            if (!overlap) {
+              // Generate lines inside the rectangle
+              const rect = {
+                left: rectLeft,
+                top: rectTop,
+                width: rectWidth,
+                height: rectHeight,
+              };
+
+              const { upColor, downColor, lines } = generateLinesInRectangle(
+                rect,
+                bgColor
+              );
+
+              rect.upColor = upColor;
+              rect.downColor = downColor;
+              rect.lines = lines;
+
+              rectangles.push(rect);
+            }
+          }
+
+          // Now, render the rectangles and lines in the input and output grids
+          rectangles.forEach((rect) => {
+            // Create rectangle div for input grid
+            const rectDivInput = document.createElement("div");
+            rectDivInput.style.position = "absolute";
+            rectDivInput.style.left = rect.left + "px";
+            rectDivInput.style.top = rect.top + "px";
+            rectDivInput.style.width = rect.width + "px";
+            rectDivInput.style.height = rect.height + "px";
+            rectDivInput.style.overflow = "visible";
+
+            // Create rectangle div for output grid
+            const rectDivOutput = rectDivInput.cloneNode(true);
+
+            // Create lines in input grid
+            rect.lines.forEach((line) => {
+              const lineDiv = document.createElement("div");
+              lineDiv.style.position = "absolute";
+              lineDiv.style.left = line.x + "px";
+              lineDiv.style.top = line.y + "px";
+              lineDiv.style.width = "1px";
+              lineDiv.style.height = line.height + "px";
+              lineDiv.style.backgroundColor = line.color;
+
+              rectDivInput.appendChild(lineDiv);
+            });
+
+            // Create lines in output grid, shifting the lines
+            rect.lines.forEach((line) => {
+              const lineDiv = document.createElement("div");
+              let shiftedX = line.x;
+              if (line.direction === "up") {
+                shiftedX = line.x - shiftAmount;
+              } else if (line.direction === "down") {
+                shiftedX = line.x + shiftAmount;
+              }
+
+              lineDiv.style.position = "absolute";
+              lineDiv.style.left = shiftedX + "px";
+              lineDiv.style.top = line.y + "px";
+              lineDiv.style.width = "1px";
+              lineDiv.style.height = line.height + "px";
+              lineDiv.style.backgroundColor = line.color;
+
+              rectDivOutput.appendChild(lineDiv);
+            });
+
+            // Append rectangles to grids
+            gridInput.appendChild(rectDivInput);
+            gridOutput.appendChild(rectDivOutput);
+          });
+        }
+
+        function generateLinesInRectangle(rect, bgColor) {
+          const lines = [];
+          const middleY = Math.floor(rect.height / 2);
+
+          const availableColors = colors.filter((color) => color !== bgColor);
+
+          const upColor =
+            availableColors[Math.floor(Math.random() * availableColors.length)];
+          let downColor =
+            availableColors[Math.floor(Math.random() * availableColors.length)];
+
+          // Ensure upColor and downColor are different
+          while (downColor === upColor && availableColors.length > 1) {
+            downColor =
+              availableColors[
+                Math.floor(Math.random() * availableColors.length)
+              ];
+          }
+
+          for (let x = 0; x < rect.width; x++) {
+            const maxUpHeight = middleY;
+            const maxDownHeight = rect.height - middleY - 1;
+
+            let upHeight = 0;
+            let downHeight = 0;
+
+            if (maxUpHeight > 0) {
+              upHeight = Math.floor(Math.random() * maxUpHeight) + 1;
+            }
+
+            if (maxDownHeight > 0) {
+              downHeight = Math.floor(Math.random() * maxDownHeight) + 1;
+            }
+
+            if (upHeight > 0) {
+              lines.push({
+                x: x,
+                y: middleY - upHeight + 1,
+                height: upHeight,
+                color: upColor,
+                direction: "up",
+              });
+            }
+
+            if (downHeight > 0) {
+              lines.push({
+                x: x,
+                y: middleY + 1,
+                height: downHeight,
+                color: downColor,
+                direction: "down",
+              });
+            }
+          }
+
+          return {
+            upColor: upColor,
+            downColor: downColor,
+            lines: lines,
+          };
+        }
+      });
+    </script>
+  </body>
+</html>

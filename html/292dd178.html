@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>292dd178</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        max-height: 30px;
+        max-width: 30px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function init() {
+        const main = document.querySelector("main");
+
+        // Random number of pairs between 2 and 5
+        const numPairs = Math.floor(Math.random() * 4) + 2;
+
+        const pairBackgroundColors = [];
+
+        // Create pairs and pick background colors
+        for (let i = 0; i < numPairs; i++) {
+          // Create the pair div
+          const pairDiv = document.createElement("div");
+          pairDiv.classList.add("pair");
+
+          // Create the input container
+          const inputContainer = document.createElement("div");
+          inputContainer.classList.add("container");
+          const inputGrid = document.createElement("div");
+          inputGrid.id = `input-${i + 1}`;
+          inputGrid.classList.add("grid");
+          inputContainer.appendChild(inputGrid);
+
+          // Create the output container
+          const outputContainer = document.createElement("div");
+          outputContainer.classList.add("container");
+          const outputGrid = document.createElement("div");
+          outputGrid.id = `output-${i + 1}`;
+          outputGrid.classList.add("grid");
+          outputContainer.appendChild(outputGrid);
+
+          // Append containers to pair
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pair to main
+          main.appendChild(pairDiv);
+
+          // Pick a background color for the pair
+          const bgColor = colors[Math.floor(Math.random() * colors.length)];
+          pairBackgroundColors.push(bgColor);
+        }
+
+        // Pick border and fill colors different from background colors
+        const availableColors = colors.filter(
+          (color) => !pairBackgroundColors.includes(color)
+        );
+
+        if (availableColors.length < 2) {
+          console.error(
+            "Not enough colors to pick border and fill colors different from background colors."
+          );
+          return;
+        }
+
+        // Shuffle availableColors
+        for (let i = availableColors.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [availableColors[i], availableColors[j]] = [
+            availableColors[j],
+            availableColors[i],
+          ];
+        }
+
+        const borderColor = availableColors[0];
+        const fillColor = availableColors[1];
+
+        // For each pair
+        for (let i = 0; i < numPairs; i++) {
+          const inputGrid = document.getElementById(`input-${i + 1}`);
+          const outputGrid = document.getElementById(`output-${i + 1}`);
+
+          // Grid sizes between 9x9 and 20x20 pixels
+          const gridWidth = Math.floor(Math.random() * 12) + 9;
+          const gridHeight = Math.floor(Math.random() * 12) + 9;
+
+          // Set the size of the grids
+          inputGrid.style.width = gridWidth + "px";
+          inputGrid.style.height = gridHeight + "px";
+          outputGrid.style.width = gridWidth + "px";
+          outputGrid.style.height = gridHeight + "px";
+
+          // Set background color
+          const bgColor = pairBackgroundColors[i];
+          inputGrid.style.backgroundColor = bgColor;
+          outputGrid.style.backgroundColor = bgColor;
+
+          // Set position relative
+          inputGrid.style.position = "relative";
+          outputGrid.style.position = "relative";
+
+          // Draw 2-4 rectangles
+          const numRectangles = Math.floor(Math.random() * 3) + 2;
+          const rectangles = [];
+
+          for (let r = 0; r < numRectangles; r++) {
+            const rectWidth = Math.floor(Math.random() * 3) + 4;
+            const rectHeight = Math.floor(Math.random() * 3) + 4;
+
+            const maxLeft = gridWidth - rectWidth;
+            const maxTop = gridHeight - rectHeight;
+
+            let attempts = 0;
+            const maxAttempts = 100;
+            let rectLeft, rectTop;
+            let overlaps;
+
+            do {
+              rectLeft = Math.floor(Math.random() * (maxLeft + 1));
+              rectTop = Math.floor(Math.random() * (maxTop + 1));
+
+              overlaps = rectangles.some((rect) => {
+                return !(
+                  rectLeft + rectWidth <= rect.left ||
+                  rectLeft >= rect.left + rect.width ||
+                  rectTop + rectHeight <= rect.top ||
+                  rectTop >= rect.top + rect.height
+                );
+              });
+
+              attempts++;
+            } while (overlaps && attempts < maxAttempts);
+
+            if (attempts >= maxAttempts) {
+              continue;
+            }
+
+            const rectangle = {
+              left: rectLeft,
+              top: rectTop,
+              width: rectWidth,
+              height: rectHeight,
+              missingPixel: null,
+              missingSide: null,
+            };
+
+            rectangles.push(rectangle);
+          }
+
+          // Pick missing pixels
+          rectangles.forEach((rect) => {
+            const sides = ["top", "right", "bottom", "left"];
+            const side = sides[Math.floor(Math.random() * sides.length)];
+            rect.missingSide = side;
+
+            let missingPixelPosition;
+
+            switch (side) {
+              case "top":
+                missingPixelPosition = {
+                  x:
+                    rect.left +
+                    1 +
+                    Math.floor(Math.random() * (rect.width - 2)),
+                  y: rect.top,
+                };
+                break;
+              case "right":
+                missingPixelPosition = {
+                  x: rect.left + rect.width - 1,
+                  y:
+                    rect.top +
+                    1 +
+                    Math.floor(Math.random() * (rect.height - 2)),
+                };
+                break;
+              case "bottom":
+                missingPixelPosition = {
+                  x:
+                    rect.left +
+                    1 +
+                    Math.floor(Math.random() * (rect.width - 2)),
+                  y: rect.top + rect.height - 1,
+                };
+                break;
+              case "left":
+                missingPixelPosition = {
+                  x: rect.left,
+                  y:
+                    rect.top +
+                    1 +
+                    Math.floor(Math.random() * (rect.height - 2)),
+                };
+                break;
+            }
+
+            rect.missingPixel = missingPixelPosition;
+          });
+
+          // Draw rectangles on input grid
+          rectangles.forEach((rect) => {
+            const rectDiv = document.createElement("div");
+            rectDiv.style.position = "absolute";
+            rectDiv.style.left = rect.left + "px";
+            rectDiv.style.top = rect.top + "px";
+            rectDiv.style.width = rect.width + "px";
+            rectDiv.style.height = rect.height + "px";
+            rectDiv.style.border = "1px solid " + borderColor;
+            rectDiv.style.boxSizing = "border-box";
+            rectDiv.style.backgroundColor = "transparent";
+            inputGrid.appendChild(rectDiv);
+
+            // Missing pixel (set to background color)
+            const pixelDiv = document.createElement("div");
+            pixelDiv.style.position = "absolute";
+            pixelDiv.style.left = rect.missingPixel.x + "px";
+            pixelDiv.style.top = rect.missingPixel.y + "px";
+            pixelDiv.style.width = "1px";
+            pixelDiv.style.height = "1px";
+            pixelDiv.style.backgroundColor = bgColor;
+            inputGrid.appendChild(pixelDiv);
+          });
+
+          // Draw rectangles on output grid
+          rectangles.forEach((rect) => {
+            const rectDiv = document.createElement("div");
+            rectDiv.style.position = "absolute";
+            rectDiv.style.left = rect.left + "px";
+            rectDiv.style.top = rect.top + "px";
+            rectDiv.style.width = rect.width + "px";
+            rectDiv.style.height = rect.height + "px";
+            rectDiv.style.border = "1px solid " + borderColor;
+            rectDiv.style.boxSizing = "border-box";
+            rectDiv.style.backgroundColor = fillColor;
+            rectDiv.style.zIndex = 1;
+            outputGrid.appendChild(rectDiv);
+
+            // Draw the missing pixel with fill color
+            const pixelDiv = document.createElement("div");
+            pixelDiv.style.position = "absolute";
+            pixelDiv.style.left = rect.missingPixel.x + "px";
+            pixelDiv.style.top = rect.missingPixel.y + "px";
+            pixelDiv.style.width = "1px";
+            pixelDiv.style.height = "1px";
+            pixelDiv.style.backgroundColor = fillColor;
+            pixelDiv.style.zIndex = 2;
+            outputGrid.appendChild(pixelDiv);
+          });
+
+          // Extend missing pixels to edge
+          rectangles.forEach((rect) => {
+            const lineDiv = document.createElement("div");
+            lineDiv.style.position = "absolute";
+            lineDiv.style.backgroundColor = fillColor;
+
+            const x = rect.missingPixel.x;
+            const y = rect.missingPixel.y;
+
+            switch (rect.missingSide) {
+              case "top":
+                lineDiv.style.left = x + "px";
+                lineDiv.style.top = "0px";
+                lineDiv.style.width = "1px";
+                lineDiv.style.height = y + "px";
+                break;
+              case "right":
+                lineDiv.style.left = x + 1 + "px";
+                lineDiv.style.top = y + "px";
+                lineDiv.style.width = gridWidth - x - 1 + "px";
+                lineDiv.style.height = "1px";
+                break;
+              case "bottom":
+                lineDiv.style.left = x + "px";
+                lineDiv.style.top = y + 1 + "px";
+                lineDiv.style.width = "1px";
+                lineDiv.style.height = gridHeight - y - 1 + "px";
+                break;
+              case "left":
+                lineDiv.style.left = "0px";
+                lineDiv.style.top = y + "px";
+                lineDiv.style.width = x + "px";
+                lineDiv.style.height = "1px";
+                break;
+            }
+
+            lineDiv.style.zIndex = 0;
+            outputGrid.appendChild(lineDiv);
+          });
+        }
+      }
+
+      window.onload = init;
+    </script>
+  </body>
+</html>

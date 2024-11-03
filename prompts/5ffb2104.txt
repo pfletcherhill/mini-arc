@@ -1,0 +1,3 @@
+- For each pair, the input and output grids should be the same size, which should be from 6x6px to 20x20px, though it does not need to be square
+- For each input grid, add 5-12 shapes to the grid. Each shape can be from 1x1px to 3x3px and should look like tetris shapes by coloring some or all of the pixels inside the shape, though always connected. The shapes should have random colors.
+- For each output grid, all the shapes from the input grid should shift to one of the sides of the grid, as if pulled by gravity. All pairs in the same puzzle should shift shapes to the same side. Move shapes in the given direction until they hit the boundary of the grid or stack on top of one another.

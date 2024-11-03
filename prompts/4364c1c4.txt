@@ -1,0 +1,5 @@
+- For each pair, the input and output grids should be the same size, which is between 12x12px and 20x20px, though it doesn't have to be square.
+- Pick a random background color for each pair and use the background color for both the input and output grids.
+- For each input grid, add 1-3 rectangles, each from 3x3px to 9x9px in size, though they don't have to be square. Rectangles should not touch each other or overlap with each other. All rectangles should have at least 4px padding between them and any other rectangles. Do not place a rectangle if it would touch or overlap with another rectangle.
+- Inside each rectangle, pick a middle point and fill the rectangle by drawing 1px lines from the middle point up and down in varying heights, though never tall enough that the line would go beyond the rectangle. The lines going up should be filled in one color and the lines going down should be another color.
+- For each output grid, copy the shape, position, and color of the rectangles and their lines from the input grid. Then shift the lines going up from the middle point 1px to the left and shift all the lines going down from the middle point 1px to the right. 

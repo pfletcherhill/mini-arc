@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>351d6448</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Pairs will be generated here -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      document.addEventListener("DOMContentLoaded", function () {
+        // Pick a random number of pairs between 2 and 5
+        var numPairs = Math.floor(Math.random() * 4) + 2; // 2 to 5
+
+        // Pick a background color for the grids, which should be black for 60% of puzzles
+        var bgColor;
+        if (Math.random() < 0.6) {
+          bgColor = "#111111"; // black
+        } else {
+          // Pick a random color from colors array excluding black
+          var otherColors = colors.filter(function (color) {
+            return color !== "#111111";
+          });
+          bgColor = otherColors[Math.floor(Math.random() * otherColors.length)];
+        }
+
+        // For the puzzle, pick a frame height (2-4px) and width (12-20px).
+        var frameHeight = Math.floor(Math.random() * 3) + 2; // 2 to 4
+        var frameWidth = Math.floor(Math.random() * 9) + 12; // 12 to 20
+
+        // For the puzzle, pick a border color, which can be any color other than the background color.
+        var borderColors = colors.filter(function (color) {
+          return color !== bgColor;
+        });
+        var borderColor =
+          borderColors[Math.floor(Math.random() * borderColors.length)];
+
+        var main = document.querySelector("main");
+
+        for (var i = 1; i <= numPairs; i++) {
+          // Create the pair div
+          var pairDiv = document.createElement("div");
+          pairDiv.className = "pair";
+
+          // Create the input container
+          var inputContainer = document.createElement("div");
+          inputContainer.className = "container";
+          var inputGrid = document.createElement("div");
+          inputGrid.className = "grid";
+          inputGrid.id = "input-" + i;
+
+          // Append input grid to container
+          inputContainer.appendChild(inputGrid);
+
+          // Create the output container
+          var outputContainer = document.createElement("div");
+          outputContainer.className = "container";
+          var outputGrid = document.createElement("div");
+          outputGrid.className = "grid";
+          outputGrid.id = "output-" + i;
+
+          // Append output grid to container
+          outputContainer.appendChild(outputGrid);
+
+          // Append containers to pairDiv
+          pairDiv.appendChild(inputContainer);
+          pairDiv.appendChild(outputContainer);
+
+          // Append pairDiv to main
+          main.appendChild(pairDiv);
+
+          // For each pair, pick a number of frames (4-5)
+          var numFrames = Math.floor(Math.random() * 2) + 4; // 4 to 5
+
+          // Pick a transformation type (1 to 3)
+          var transformationType = Math.floor(Math.random() * 3) + 1;
+
+          // Generate the frames and apply to the grids
+          generateFrames(
+            inputGrid,
+            outputGrid,
+            numFrames,
+            transformationType,
+            frameWidth,
+            frameHeight,
+            bgColor,
+            borderColor
+          );
+        }
+
+        function generateFrames(
+          inputGrid,
+          outputGrid,
+          numFrames,
+          transformationType,
+          frameWidth,
+          frameHeight,
+          bgColor,
+          borderColor
+        ) {
+          var transformationParams = {};
+
+          // Generate parameters for the transformation
+          switch (transformationType) {
+            case 1:
+              // Transformation 1 parameters
+              transformationParams.shapeWidth =
+                Math.floor(Math.random() * 3) + 1; // 1 to 3
+              transformationParams.shapeHeight =
+                Math.floor(Math.random() * 3) + 1; // 1 to 3
+
+              // Pick two colors from the colors array excluding bgColor
+              var colorsForShape = colors.filter(function (color) {
+                return color !== bgColor;
+              });
+              transformationParams.color1 =
+                colorsForShape[
+                  Math.floor(Math.random() * colorsForShape.length)
+                ];
+              transformationParams.color2 =
+                colorsForShape[
+                  Math.floor(Math.random() * colorsForShape.length)
+                ];
+
+              // Ensure colors are different
+              while (
+                transformationParams.color2 === transformationParams.color1
+              ) {
+                transformationParams.color2 =
+                  colorsForShape[
+                    Math.floor(Math.random() * colorsForShape.length)
+                  ];
+              }
+
+              // Decide shift amount per frame (1-2px)
+              transformationParams.shiftAmount =
+                Math.floor(Math.random() * 2) + 1; // 1 or 2
+
+              break;
+            case 2:
+              // Transformation 2 parameters
+              transformationParams.lineHeight =
+                Math.floor(Math.random() * frameHeight) + 1; // 1 to frameHeight
+              transformationParams.growthPerFrame =
+                Math.floor(Math.random() * 2) + 1; // 1 or 2
+
+              // Pick line color
+              var colorsForLine = colors.filter(function (color) {
+                return color !== bgColor;
+              });
+              transformationParams.lineColor =
+                colorsForLine[Math.floor(Math.random() * colorsForLine.length)];
+              break;
+            case 3:
+              // Transformation 3 parameters
+              // For simplicity, let's pick a checkerboard pattern
+              transformationParams.pattern = "checkerboard";
+
+              transformationParams.colIncrement =
+                Math.floor(Math.random() * 3) + 1; // 1 to 3
+
+              // Pick two colors
+              var colorsForPattern = colors.filter(function (color) {
+                return color !== bgColor;
+              });
+              transformationParams.patternColor =
+                colorsForPattern[
+                  Math.floor(Math.random() * colorsForPattern.length)
+                ];
+              transformationParams.fillColor =
+                colorsForPattern[
+                  Math.floor(Math.random() * colorsForPattern.length)
+                ];
+
+              // Ensure colors are different
+              while (
+                transformationParams.fillColor ===
+                transformationParams.patternColor
+              ) {
+                transformationParams.fillColor =
+                  colorsForPattern[
+                    Math.floor(Math.random() * colorsForPattern.length)
+                  ];
+              }
+
+              break;
+          }
+
+          // Set the input grid dimensions
+          inputGrid.style.width = frameWidth + "px";
+          inputGrid.style.height =
+            (numFrames - 1) * frameHeight + (numFrames - 2) * 1 + "px";
+          inputGrid.style.backgroundColor = borderColor;
+
+          // Set the output grid dimensions
+          outputGrid.style.width = frameWidth + "px";
+          outputGrid.style.height = frameHeight + "px";
+          outputGrid.style.backgroundColor = bgColor;
+
+          // Now generate frames
+          for (var f = 0; f < numFrames - 1; f++) {
+            var frameDiv = document.createElement("div");
+            frameDiv.style.width = frameWidth + "px";
+            frameDiv.style.height = frameHeight + "px";
+            frameDiv.style.display = "block";
+            frameDiv.style.backgroundColor = bgColor;
+            frameDiv.style.position = "relative";
+
+            // Apply the transformation to the frame
+            applyTransformation(
+              frameDiv,
+              f,
+              transformationType,
+              numFrames,
+              transformationParams,
+              frameWidth,
+              frameHeight,
+              bgColor
+            );
+
+            // Append the frameDiv to the input grid
+            inputGrid.appendChild(frameDiv);
+
+            // Add a border between frames except after the last frame
+            if (f < numFrames - 2) {
+              var borderDiv = document.createElement("div");
+              borderDiv.style.width = frameWidth + "px";
+              borderDiv.style.height = "1px";
+              borderDiv.style.backgroundColor = borderColor;
+              inputGrid.appendChild(borderDiv);
+            }
+          }
+
+          // For the output grid, generate the last frame
+          var outputFrameDiv = document.createElement("div");
+          outputFrameDiv.style.width = frameWidth + "px";
+          outputFrameDiv.style.height = frameHeight + "px";
+          outputFrameDiv.style.backgroundColor = bgColor;
+          outputFrameDiv.style.position = "relative";
+
+          // Apply the transformation to the last frame
+          applyTransformation(
+            outputFrameDiv,
+            numFrames - 1,
+            transformationType,
+            numFrames,
+            transformationParams,
+            frameWidth,
+            frameHeight,
+            bgColor
+          );
+
+          // Append the outputFrameDiv to the output grid
+          outputGrid.appendChild(outputFrameDiv);
+        }
+
+        function applyTransformation(
+          frameDiv,
+          frameIndex,
+          transformationType,
+          numFrames,
+          params,
+          frameWidth,
+          frameHeight,
+          bgColor
+        ) {
+          switch (transformationType) {
+            case 1:
+              transformation1(
+                frameDiv,
+                frameIndex,
+                numFrames,
+                params,
+                frameWidth,
+                frameHeight
+              );
+              break;
+            case 2:
+              transformation2(
+                frameDiv,
+                frameIndex,
+                numFrames,
+                params,
+                frameWidth,
+                frameHeight
+              );
+              break;
+            case 3:
+              transformation3(
+                frameDiv,
+                frameIndex,
+                numFrames,
+                params,
+                frameWidth,
+                frameHeight,
+                bgColor
+              );
+              break;
+          }
+        }
+
+        function transformation1(
+          frameDiv,
+          frameIndex,
+          numFrames,
+          params,
+          frameWidth,
+          frameHeight
+        ) {
+          var shapeWidth = params.shapeWidth;
+          var shapeHeight = params.shapeHeight;
+          var color1 = params.color1;
+          var color2 = params.color2;
+          var shiftAmount = params.shiftAmount;
+
+          // Calculate the left position of the shape in this frame
+          var leftPosition = frameIndex * shiftAmount;
+
+          // Ensure the shape stays within the frameWidth
+          if (leftPosition + shapeWidth > frameWidth) {
+            leftPosition = frameWidth - shapeWidth;
+          }
+
+          // Create the shape
+          for (var y = 0; y < shapeHeight; y++) {
+            for (var x = 0; x < shapeWidth; x++) {
+              var pixelDiv = document.createElement("div");
+              pixelDiv.style.width = "1px";
+              pixelDiv.style.height = "1px";
+              pixelDiv.style.position = "absolute";
+              pixelDiv.style.left = leftPosition + x + "px";
+              pixelDiv.style.top = y + "px";
+              pixelDiv.style.backgroundColor =
+                (x + y) % 2 === 0 ? color1 : color2;
+              frameDiv.appendChild(pixelDiv);
+            }
+          }
+        }
+
+        function transformation2(
+          frameDiv,
+          frameIndex,
+          numFrames,
+          params,
+          frameWidth,
+          frameHeight
+        ) {
+          var lineHeight = params.lineHeight;
+          var growthPerFrame = params.growthPerFrame;
+          var lineColor = params.lineColor;
+
+          // Calculate the length of the line in this frame
+          var lineLength = (frameIndex + 1) * growthPerFrame;
+
+          // Ensure the line does not exceed frameWidth
+          if (lineLength > frameWidth) {
+            lineLength = frameWidth;
+          }
+
+          // Position the line at the left edge
+          var topPosition = Math.floor((frameHeight - lineHeight) / 2);
+
+          // Create the line
+          var lineDiv = document.createElement("div");
+          lineDiv.style.width = lineLength + "px";
+          lineDiv.style.height = lineHeight + "px";
+          lineDiv.style.position = "absolute";
+          lineDiv.style.left = "0px";
+          lineDiv.style.top = topPosition + "px";
+
+          lineDiv.style.backgroundColor = lineColor;
+
+          frameDiv.appendChild(lineDiv);
+        }
+
+        function transformation3(
+          frameDiv,
+          frameIndex,
+          numFrames,
+          params,
+          frameWidth,
+          frameHeight,
+          bgColor
+        ) {
+          var patternColor = params.patternColor;
+          var fillColor = params.fillColor;
+          var colIncrement = params.colIncrement;
+
+          // Calculate the number of columns to color in this frame
+          var numColsToColor = (frameIndex + 1) * colIncrement;
+
+          // Ensure we do not exceed frameWidth
+          if (numColsToColor > frameWidth) {
+            numColsToColor = frameWidth;
+          }
+
+          // Draw the pattern
+          for (var y = 0; y < frameHeight; y++) {
+            for (var x = 0; x < frameWidth; x++) {
+              var pixelDiv = document.createElement("div");
+              pixelDiv.style.width = "1px";
+              pixelDiv.style.height = "1px";
+              pixelDiv.style.position = "absolute";
+              pixelDiv.style.left = x + "px";
+              pixelDiv.style.top = y + "px";
+
+              if (x < numColsToColor) {
+                // Left columns, use fillColor
+                pixelDiv.style.backgroundColor = fillColor;
+              } else {
+                // Rest of the frame, apply pattern
+                if (params.pattern === "checkerboard") {
+                  pixelDiv.style.backgroundColor =
+                    (x + y) % 2 === 0 ? patternColor : bgColor;
+                } else {
+                  pixelDiv.style.backgroundColor = patternColor;
+                }
+              }
+
+              frameDiv.appendChild(pixelDiv);
+            }
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>5ffb2104</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+        height: 30px;
+        width: 30px;
+      }
+      .grid {
+        position: relative;
+        background-color: #111111;
+        overflow: hidden;
+        display: grid;
+      }
+      .cell {
+        box-sizing: border-box;
+        border: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main">
+      <!-- Pairs will be added dynamically -->
+    </main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      const directions = ["left", "right", "up", "down"];
+      const shiftDirection = directions[randInt(0, directions.length - 1)];
+
+      let gridBackgroundColor =
+        Math.random() < 0.6 ? "#111111" : colors[randInt(0, colors.length - 1)];
+
+      const numPairs = randInt(2, 5);
+      const mainElement = document.getElementById("main");
+
+      for (let i = 1; i <= numPairs; i++) {
+        const pairDiv = document.createElement("div");
+        pairDiv.classList.add("pair");
+
+        const container1 = document.createElement("div");
+        container1.classList.add("container");
+        const grid1 = document.createElement("div");
+        grid1.id = `input-${i}`;
+        grid1.classList.add("grid");
+        container1.appendChild(grid1);
+
+        const container2 = document.createElement("div");
+        container2.classList.add("container");
+        const grid2 = document.createElement("div");
+        grid2.id = `output-${i}`;
+        grid2.classList.add("grid");
+        container2.appendChild(grid2);
+
+        pairDiv.appendChild(container1);
+        pairDiv.appendChild(container2);
+
+        mainElement.appendChild(pairDiv);
+      }
+
+      for (let i = 1; i <= numPairs; i++) {
+        const rows = randInt(6, 20);
+        const cols = randInt(6, 20);
+        const cellWidth = 1;
+        const cellHeight = 1;
+
+        const inputGrid = document.getElementById(`input-${i}`);
+        inputGrid.style.backgroundColor = gridBackgroundColor;
+        inputGrid.style.display = "grid";
+        inputGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellWidth}px)`;
+        inputGrid.style.gridTemplateRows = `repeat(${rows}, ${cellHeight}px)`;
+        inputGrid.style.width = `${cols * cellWidth}px`;
+        inputGrid.style.height = `${rows * cellHeight}px`;
+
+        let gridData = [];
+        for (let r = 0; r < rows; r++) {
+          gridData.push(new Array(cols).fill(null));
+        }
+
+        const numShapes = randInt(5, 12);
+
+        for (let s = 0; s < numShapes; s++) {
+          const shapeRows = randInt(1, 3);
+          const shapeCols = randInt(1, 3);
+          let shapePlaced = false;
+          let attempts = 0;
+          while (!shapePlaced && attempts < 100) {
+            attempts++;
+            const startRow = randInt(0, rows - shapeRows);
+            const startCol = randInt(0, cols - shapeCols);
+
+            let spaceAvailable = true;
+            for (let r = 0; r < shapeRows; r++) {
+              for (let c = 0; c < shapeCols; c++) {
+                if (gridData[startRow + r][startCol + c]) {
+                  spaceAvailable = false;
+                  break;
+                }
+              }
+              if (!spaceAvailable) break;
+            }
+
+            if (spaceAvailable) {
+              let shapePattern = [];
+              for (let r = 0; r < shapeRows; r++) {
+                shapePattern.push(new Array(shapeCols).fill(0));
+              }
+              let cellsToFill = randInt(1, shapeRows * shapeCols);
+              let shapeCells = [{ r: 0, c: 0 }];
+              shapePattern[0][0] = 1;
+              cellsToFill--;
+              while (cellsToFill > 0) {
+                let edgeCells = [];
+                for (let cell of shapeCells) {
+                  const neighbors = [
+                    { r: cell.r - 1, c: cell.c },
+                    { r: cell.r + 1, c: cell.c },
+                    { r: cell.r, c: cell.c - 1 },
+                    { r: cell.r, c: cell.c + 1 },
+                  ];
+                  for (let n of neighbors) {
+                    if (
+                      n.r >= 0 &&
+                      n.r < shapeRows &&
+                      n.c >= 0 &&
+                      n.c < shapeCols &&
+                      shapePattern[n.r][n.c] === 0
+                    ) {
+                      edgeCells.push(n);
+                    }
+                  }
+                }
+                if (edgeCells.length === 0) break;
+                const idx = randInt(0, edgeCells.length - 1);
+                const newCell = edgeCells[idx];
+                shapePattern[newCell.r][newCell.c] = 1;
+                shapeCells.push(newCell);
+                cellsToFill--;
+              }
+
+              const shapeColor = colors[randInt(1, colors.length - 1)];
+
+              for (let r = 0; r < shapeRows; r++) {
+                for (let c = 0; c < shapeCols; c++) {
+                  if (shapePattern[r][c] === 1) {
+                    gridData[startRow + r][startCol + c] = {
+                      color: shapeColor,
+                      shapeId: s,
+                    };
+                  }
+                }
+              }
+              shapePlaced = true;
+            }
+          }
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cellDiv = document.createElement("div");
+            cellDiv.classList.add("cell");
+            cellDiv.style.width = `${cellWidth}px`;
+            cellDiv.style.height = `${cellHeight}px`;
+
+            if (gridData[r][c]) {
+              cellDiv.style.backgroundColor = gridData[r][c].color;
+            } else {
+              cellDiv.style.backgroundColor = "transparent";
+            }
+
+            inputGrid.appendChild(cellDiv);
+          }
+        }
+
+        // Output Grid
+        const outputGrid = document.getElementById(`output-${i}`);
+        outputGrid.style.backgroundColor = gridBackgroundColor;
+        outputGrid.style.display = "grid";
+        outputGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellWidth}px)`;
+        outputGrid.style.gridTemplateRows = `repeat(${rows}, ${cellHeight}px`;
+        outputGrid.style.width = `${cols * cellWidth}px`;
+        outputGrid.style.height = `${rows * cellHeight}px`;
+
+        // Deep copy of gridData for output
+        let outputGridData = [];
+        for (let r = 0; r < rows; r++) {
+          outputGridData.push(new Array(cols).fill(null));
+        }
+
+        // Initialize shapes
+        const shapes = {};
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = gridData[r][c];
+            if (cell) {
+              if (!shapes[cell.shapeId]) {
+                shapes[cell.shapeId] = [];
+              }
+              shapes[cell.shapeId].push({ r, c, color: cell.color });
+            }
+          }
+        }
+
+        // Determine shape order based on shift direction
+        let shapeOrder = [];
+        for (let shapeId in shapes) {
+          let shapeCells = shapes[shapeId];
+          let sortIndex;
+          if (shiftDirection === "down") {
+            sortIndex = Math.max(...shapeCells.map((cell) => cell.r));
+          } else if (shiftDirection === "up") {
+            sortIndex = Math.min(...shapeCells.map((cell) => cell.r));
+          } else if (shiftDirection === "left") {
+            sortIndex = Math.min(...shapeCells.map((cell) => cell.c));
+          } else if (shiftDirection === "right") {
+            sortIndex = Math.max(...shapeCells.map((cell) => cell.c));
+          }
+          shapeOrder.push({ shapeId, sortIndex });
+        }
+
+        // Sort shapes based on shift direction
+        if (shiftDirection === "down" || shiftDirection === "right") {
+          shapeOrder.sort((a, b) => b.sortIndex - a.sortIndex);
+        } else {
+          shapeOrder.sort((a, b) => a.sortIndex - b.sortIndex);
+        }
+
+        // Copy initial positions to outputGridData
+        for (let shapeId in shapes) {
+          let shapeCells = shapes[shapeId];
+          for (let cell of shapeCells) {
+            outputGridData[cell.r][cell.c] = {
+              color: cell.color,
+              shapeId: parseInt(shapeId),
+            };
+          }
+        }
+
+        for (let item of shapeOrder) {
+          let shapeId = item.shapeId;
+          let shapeCells = shapes[shapeId];
+
+          let moved = true;
+          while (moved) {
+            moved = false;
+            // Prepare to check the next position
+            let newPositions = shapeCells.map((cell) => {
+              let newRow = cell.r;
+              let newCol = cell.c;
+
+              if (shiftDirection === "down") {
+                newRow += 1;
+              } else if (shiftDirection === "up") {
+                newRow -= 1;
+              } else if (shiftDirection === "left") {
+                newCol -= 1;
+              } else if (shiftDirection === "right") {
+                newCol += 1;
+              }
+
+              return { r: newRow, c: newCol };
+            });
+
+            // Check for collisions
+            let canMove = true;
+            for (let pos of newPositions) {
+              if (
+                pos.r < 0 ||
+                pos.r >= rows ||
+                pos.c < 0 ||
+                pos.c >= cols ||
+                (outputGridData[pos.r][pos.c] &&
+                  outputGridData[pos.r][pos.c].shapeId !== parseInt(shapeId))
+              ) {
+                canMove = false;
+                break;
+              }
+            }
+
+            if (canMove) {
+              // Clear current positions
+              for (let cell of shapeCells) {
+                outputGridData[cell.r][cell.c] = null;
+              }
+              // Update positions
+              for (let idx = 0; idx < shapeCells.length; idx++) {
+                let cell = shapeCells[idx];
+                cell.r = newPositions[idx].r;
+                cell.c = newPositions[idx].c;
+              }
+              // Place at new positions
+              for (let cell of shapeCells) {
+                outputGridData[cell.r][cell.c] = {
+                  color: cell.color,
+                  shapeId: parseInt(shapeId),
+                };
+              }
+              moved = true;
+            }
+          }
+        }
+
+        // Render output grid
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cellDiv = document.createElement("div");
+            cellDiv.classList.add("cell");
+            cellDiv.style.width = `${cellWidth}px`;
+            cellDiv.style.height = `${cellHeight}px`;
+
+            if (outputGridData[r][c]) {
+              cellDiv.style.backgroundColor = outputGridData[r][c].color;
+            } else {
+              cellDiv.style.backgroundColor = "transparent";
+            }
+
+            outputGrid.appendChild(cellDiv);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

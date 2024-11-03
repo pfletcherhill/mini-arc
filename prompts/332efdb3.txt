@@ -1,0 +1,6 @@
+- For each pair, the input and output grids should be the same size, which can be 5x5px to 20x20px and they must be square.
+- Pick a fill color for the puzzle, which will be used in all pairs.
+- Pick a line width for the puzzle, which can be 1-2px.
+- Pick a line gap for the puzzle, which can be 1-2px.
+- For each pair, the input grid should be blank.
+- For each output grid, fill the grid with checkered vertical and horizontal lines using the fill color. Draw a horizontal line that is 1-2px wide based on the line width puzzle param in the fill color, then move down 1-2px based on the gap param and draw another line. Continue moving down the puzzle and drawing lines until you reach the bottom. Do the same thing with vertical lines from the left to the right, using the same line width and gap sizes and fill color.

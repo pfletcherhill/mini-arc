@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>32e9702f</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #c2c0c0;
+      }
+      main {
+        display: block;
+      }
+      .pair {
+        display: flex;
+      }
+      .container {
+        position: relative;
+        height: 30px;
+        width: 30px;
+        background-color: #c2c0c0;
+        margin: 0px;
+        padding: 0px;
+      }
+      .grid {
+        position: relative;
+        overflow: hidden;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+      .line {
+        position: absolute;
+      }
+    </style>
+  </head>
+  <body>
+    <main></main>
+
+    <script>
+      const colors = [
+        "#111111", // black
+        "#1E93FF", // blue
+        "#F93C31", // red
+        "#4FCC30", // green
+        "#FFDC00", // yellow
+        "#E6E6E6", // grey
+        "#E53AA3", // magenta
+        "#FF851B", // orange
+        "#87D8F1", // light blue
+        "#921231", // maroon
+      ];
+
+      // Number of pairs (2-5)
+      const numPairs = Math.floor(Math.random() * 4) + 2;
+
+      // Orientation
+      const orientations = ["vertical", "horizontal"];
+      const orientation =
+        orientations[Math.floor(Math.random() * orientations.length)];
+
+      // Direction
+      let directions;
+      if (orientation === "vertical") {
+        directions = ["up", "down"];
+      } else {
+        directions = ["left", "right"];
+      }
+      const direction =
+        directions[Math.floor(Math.random() * directions.length)];
+
+      // Shift (1px to 3px)
+      const shift = Math.floor(Math.random() * 3) + 1;
+
+      // Pick input and output background colors (same for all pairs)
+      const bgColors = colors.slice();
+      const inputBgColor = bgColors.splice(
+        Math.floor(Math.random() * bgColors.length),
+        1
+      )[0];
+      const outputBgColor = bgColors.splice(
+        Math.floor(Math.random() * bgColors.length),
+        1
+      )[0];
+
+      // Main element
+      const main = document.querySelector("main");
+
+      for (let i = 0; i < numPairs; i++) {
+        // Create pair div
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "pair";
+
+        // Create input container
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "container";
+
+        // Create output container
+        const outputContainer = document.createElement("div");
+        outputContainer.className = "container";
+
+        // Create input grid
+        const inputGrid = document.createElement("div");
+        inputGrid.className = "grid";
+        inputGrid.id = `input-${i + 1}`;
+
+        // Create output grid
+        const outputGrid = document.createElement("div");
+        outputGrid.className = "grid";
+        outputGrid.id = `output-${i + 1}`;
+
+        // Grid size (3px to 20px)
+        const width = Math.floor(Math.random() * 18) + 3;
+        const height = Math.floor(Math.random() * 18) + 3;
+
+        // Set grid sizes
+        inputGrid.style.width = width + "px";
+        inputGrid.style.height = height + "px";
+        outputGrid.style.width = width + "px";
+        outputGrid.style.height = height + "px";
+
+        // Set background colors (same for all grids)
+        inputGrid.style.backgroundColor = inputBgColor;
+        outputGrid.style.backgroundColor = outputBgColor;
+
+        // Line color (cannot be either background color)
+        const lineColors = colors.filter(
+          (color) => color !== inputBgColor && color !== outputBgColor
+        );
+        const lineColor =
+          lineColors[Math.floor(Math.random() * lineColors.length)];
+
+        // Number of lines (1 to 5)
+        const numLines = Math.floor(Math.random() * 5) + 1;
+
+        for (let j = 0; j < numLines; j++) {
+          // Create line
+          const line = document.createElement("div");
+          line.className = "line";
+          line.style.backgroundColor = lineColor;
+
+          // Line dimensions
+          const lineThickness = 1;
+
+          const maxLineLength = orientation === "vertical" ? height : width;
+          const lineLength = Math.min(
+            Math.floor(Math.random() * 6) + 3,
+            maxLineLength
+          );
+
+          if (orientation === "vertical") {
+            // Vertical line
+            line.style.width = lineThickness + "px";
+            line.style.height = lineLength + "px";
+
+            // Position within grid
+            const maxLeft = width - lineThickness;
+            const maxTop = height - lineLength;
+
+            const left = Math.floor(Math.random() * (maxLeft + 1));
+            const top = Math.floor(Math.random() * (maxTop + 1));
+
+            line.style.left = left + "px";
+            line.style.top = top + "px";
+          } else {
+            // Horizontal line
+            line.style.width = lineLength + "px";
+            line.style.height = lineThickness + "px";
+
+            // Position within grid
+            const maxLeft = width - lineLength;
+            const maxTop = height - lineThickness;
+
+            const left = Math.floor(Math.random() * (maxLeft + 1));
+            const top = Math.floor(Math.random() * (maxTop + 1));
+
+            line.style.left = left + "px";
+            line.style.top = top + "px";
+          }
+
+          // Append line to input grid
+          inputGrid.appendChild(line);
+
+          // Clone line for output grid
+          const outputLine = line.cloneNode(true);
+
+          // Shift line position based on direction and shift
+          let newLeft = parseInt(outputLine.style.left);
+          let newTop = parseInt(outputLine.style.top);
+
+          if (direction === "up") {
+            newTop -= shift;
+          } else if (direction === "down") {
+            newTop += shift;
+          } else if (direction === "left") {
+            newLeft -= shift;
+          } else if (direction === "right") {
+            newLeft += shift;
+          }
+
+          outputLine.style.left = newLeft + "px";
+          outputLine.style.top = newTop + "px";
+
+          // Append line to output grid
+          outputGrid.appendChild(outputLine);
+        }
+
+        // Append grids to containers
+        inputContainer.appendChild(inputGrid);
+        outputContainer.appendChild(outputGrid);
+
+        // Append containers to pair
+        pairDiv.appendChild(inputContainer);
+        pairDiv.appendChild(outputContainer);
+
+        // Append pair to main
+        main.appendChild(pairDiv);
+      }
+    </script>
+  </body>
+</html>
