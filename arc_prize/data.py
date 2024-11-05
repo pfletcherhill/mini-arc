@@ -138,7 +138,7 @@ def make_finetune_dataset(
         for pair in pairs:
             finetune_pairs.append([unpad_grid(grid) for grid in pair])
 
-        for length in range(2, len(finetune_pairs) + 1):
+        for length in range(3, len(finetune_pairs) + 1):
             for combination in itertools.combinations(finetune_pairs, length):
                 for permutation in itertools.permutations(combination):
                     tasks.append(list(permutation))

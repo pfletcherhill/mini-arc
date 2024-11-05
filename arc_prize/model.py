@@ -751,14 +751,12 @@ class ARCVisionEncoder(nn.Module):
         )
         self.output_layer = nn.Linear(self.d_model, self.num_classes)
 
-    def forward(
+    def embed(
         self,
         src: torch.Tensor,
         src_mask: torch.Tensor,
         tgt: Optional[torch.Tensor] = None,
-        temperature: float = 0.0,
-        need_weights: bool = False,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         batch_size, num_grids, grid_dim, grid_dim = src.shape
 
         pos_emb = self.pos_encoding.forward(
@@ -795,11 +793,6 @@ class ARCVisionEncoder(nn.Module):
 
         combined_seq = torch.cat([input_seq, output_seq], dim=1)
 
-        # Make causal mask
-        causal_mask = torch.zeros(self.seq_len, self.seq_len, device=src.device)
-        causal_mask[: self.input_seq_len, self.input_seq_len :] = 1
-        causal_mask = causal_mask.bool()
-
         # Make padding mask
         padding_mask = ~mask_patched
         padding_mask = torch.cat(
@@ -811,6 +804,25 @@ class ARCVisionEncoder(nn.Module):
             ],
             dim=1,
         )
+
+        return combined_seq, padding_mask
+
+    def forward(
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
+        need_weights: bool = False,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+        batch_size = src.shape[0]
+
+        combined_seq, padding_mask = self.embed(src, src_mask, tgt)
+
+        # Make causal mask
+        causal_mask = torch.zeros(self.seq_len, self.seq_len, device=src.device)
+        causal_mask[: self.input_seq_len, self.input_seq_len :] = 1
+        causal_mask = causal_mask.bool()
 
         output, attn_weights = self.encoder.forward(
             combined_seq,
@@ -831,17 +843,28 @@ class ARCVisionEncoder(nn.Module):
         return (output, attn_weights)
 
     def generate(
-        self, src: torch.Tensor, src_mask: torch.Tensor, need_weights: bool = False
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
+        need_weights: bool = False,
     ):
         with torch.no_grad():
             (
                 output,
                 encoder_attn_weights,
-            ) = self.forward(src, src_mask)
-        return (
-            torch.argmax(output, dim=-1),
-            encoder_attn_weights,
-        )
+            ) = self.forward(src, src_mask, tgt=tgt, temperature=temperature)
+        if temperature > 0:
+            probs = torch.softmax(output, dim=-1)
+            prediction = torch.multinomial(
+                probs.view(-1, probs.size(-1)),
+                num_samples=1,
+                replacement=True,
+            ).view(-1, *probs.size()[:-1])
+        else:
+            prediction = torch.argmax(output, dim=-1)
+        return prediction, encoder_attn_weights
 
 
 class ARCPositionalEncodingV2(nn.Module):

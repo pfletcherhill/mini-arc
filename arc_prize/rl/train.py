@@ -1,11 +1,8 @@
-import copy
-import random
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 import torch.optim as optim
 from torch.amp.autocast_mode import autocast
@@ -15,34 +12,34 @@ from torch.utils.data import DataLoader
 from arc_prize.data import (
     ARCDatasetParams,
     DistributedRandomSampler,
-    FinetuneDataset,
     collate_arc_fn,
     make_datasets,
 )
-from arc_prize.model import (
-    ARCTransformerEncoder,
-    ARCTransformerEncoderDecoder,
-    ARCTransformerEncoderDecoderParams,
-    ARCVisionEncoder,
-    ARCVisionEncoderDecoder,
-)
+from arc_prize.model import ARCVisionEncoder
+from arc_prize.rl.model import ValueNetwork, ValueNetworkParams
+from arc_prize.train import ARCTransformer, load_model_from_checkpoint
+
+
+@dataclass
+class SearchParams:
+    temperatures: list[float] = [0.1, 0.3, 0.6, 0.9]
+    beam_width: int = 3
+    num_samples_per_temperature: int = 3
+    max_depth: int = 5
 
 
 @dataclass(frozen=True)
-class ARCTrainParams:
+class ValueNetworkTrainParams:
     batch_size: int
     learning_rate: float
     weight_decay: float
-    dataset_dir: list[str]
+    model_filename: str
+    dataset_dirs: list[str]
+    search_params: SearchParams
     loss_class_weights: Optional[dict[int, float]] = None
-    meta_batch_size: Optional[int] = None
-    meta_learning_rate: Optional[float] = None
-    meta_weight_decay: Optional[float] = None
-    meta_num_epochs: Optional[int] = None
     train_steps_per_epoch: Optional[int] = None
     eval_steps_per_epoch: Optional[int] = None
     warmup_epochs: Optional[int] = None
-    refinement_ratio: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -63,178 +60,164 @@ class EpochState:
 
 
 @dataclass
-class ARCModelState:
-    model_params: ARCTransformerEncoderDecoderParams
-    model_type: Optional[str]
+class ValueNetworkTrainState:
+    model_params: ValueNetworkParams
     model_state_dict: Optional[dict]
-    train_params: ARCTrainParams
+    train_params: ValueNetworkTrainParams
     optimizer_state_dict: Optional[dict]
     epochs: list[EpochState]
     best_val_loss: float
-    # encoder_attn_weights: Optional[list] = None # Too large to keep
 
 
-ARCTransformer = (
-    ARCVisionEncoderDecoder
-    | ARCVisionEncoder
-    | ARCTransformerEncoder
-    | ARCTransformerEncoderDecoder
-)
+@dataclass
+class TrajectoryCandidate:
+    predictions: torch.Tensor
+    values: torch.Tensor
+    accuracy: Optional[torch.Tensor] = None
 
 
-def calculate_grad_norm(model: ARCTransformerEncoderDecoder):
-    total_norm = 0
-    for p in model.parameters():
-        if p.grad is not None:
-            param_norm = p.grad.data.norm(2)
-            total_norm += param_norm.item() ** 2
-    return total_norm**0.5
+@dataclass
+class Trajectory:
+    steps: list[TrajectoryCandidate]
 
 
-def calculate_param_norm(model: ARCTransformerEncoderDecoder):
-    total_norm = 0
-    for p in model.parameters():
-        param_norm = p.data.norm(2)
-        total_norm += param_norm.item() ** 2
-    return total_norm**0.5
+def generate_candidates(
+    model: ARCVisionEncoder,
+    value_network: ValueNetwork,
+    grids: torch.Tensor,
+    masks: torch.Tensor,
+    target_grids: torch.Tensor,
+    temperatures: list[float],
+    output: Optional[torch.Tensor] = None,
+    num_samples_per_temperature: int = 3,
+) -> list[TrajectoryCandidate]:
+    candidates: list[TrajectoryCandidate] = []
+    for temp in temperatures:
+        with torch.no_grad():
+            logits, _ = model.forward(grids, masks, tgt=output, temperature=temp)
+
+        probs = torch.softmax(logits, dim=-1)
+
+        samples = torch.multinomial(
+            probs.view(-1, probs.size(-1)),
+            num_samples=num_samples_per_temperature,
+            replacement=True,
+        ).view(-1, *probs.size()[:-1])
+
+        for predictions in samples:
+            seq_embedded, mask_embedded = model.embed(grids, masks, output)
+
+            value_logits = value_network.forward(seq_embedded, mask_embedded)
+
+            accuracy = (predictions == target_grids).float().mean()
+            candidate = TrajectoryCandidate(
+                predictions=predictions, values=value_logits, accuracy=accuracy
+            )
+            candidates.append(candidate)
+
+    return candidates
 
 
-def fine_tune_transformer(
-    model: nn.Module,
-    train_params: ARCTrainParams,
-    dataset: FinetuneDataset,
-    num_epochs: int,
-) -> nn.Module:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def calculate_trajectory_score(trajectory: Trajectory) -> float:
+    # TODO: update with momentum
+    length_penalty = len(trajectory.steps) * 0.02
+    last_value = trajectory.steps[-1].values.item()
+    return last_value - length_penalty
 
-    torch.backends.mha.set_fastpath_enabled(False)
 
-    model = copy.deepcopy(model)
-    model = model.to(device)
-
-    batch_size = 4
-
-    data_loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        collate_fn=collate_arc_fn,
-        num_workers=0,
+def search_and_predict(
+    model: ARCVisionEncoder,
+    value_network: ValueNetwork,
+    grids: torch.Tensor,
+    masks: torch.Tensor,
+    target_grids: torch.Tensor,
+    temperatures: list[float],
+    output: Optional[torch.Tensor] = None,
+    beam_width: int = 3,
+    max_depth: int = 5,
+    num_samples_per_temperature: int = 3,
+):
+    # Get initial candidates
+    candidates = generate_candidates(
+        model,
+        value_network,
+        grids,
+        masks,
+        target_grids,
+        temperatures,
+        output=output,
+        num_samples_per_temperature=num_samples_per_temperature,
     )
 
-    print(f"Starting fine-tuning run with dataset of {len(dataset)} training items")
-    print(f"Using batch size of {batch_size}")
+    best_candidate = max(candidates, key=lambda x: x.values.item())
 
-    class_weights = torch.ones(model.num_classes).to(device)
-    if train_params.loss_class_weights is not None:
-        for cls, weight in train_params.loss_class_weights.items():
-            class_weights[cls] = weight
+    active_trajectories = [Trajectory(steps=[candidate]) for candidate in candidates]
 
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    # Prune to top beam_width candidates based on value predictions
+    active_trajectories = sorted(
+        active_trajectories,
+        key=lambda x: calculate_trajectory_score(x),
+        reverse=True,
+    )[:beam_width]
 
-    optimizer = optim.AdamW(
-        model.parameters(),
-        lr=1e-5,
-        weight_decay=train_params.weight_decay,
-    )
+    # Iterative refinement
+    for _ in range(max_depth):
+        new_trajectories = []
 
-    scaler = GradScaler(device.type)
+        # Generate candidates from each active trajectory
+        for trajectory in active_trajectories:
+            candidates = generate_candidates(
+                model,
+                value_network,
+                grids,
+                masks,
+                target_grids,
+                temperatures,
+                output=trajectory.steps[-1].predictions,
+                num_samples_per_temperature=num_samples_per_temperature,
+            )
+            for candidate in candidates:
+                if candidate.values.item() > best_candidate.values.item():
+                    best_candidate = candidate
+                new_trajectory = Trajectory(steps=[*trajectory.steps, candidate])
+                new_trajectories.append(new_trajectory)
 
-    model.train()
-
-    for epoch in range(num_epochs):
-        train_loss = 0.0
-        train_accuracy = 0.0
-        start_time = time.time()
-
-        for batch in data_loader:
-            grids, masks, target_grid = [item.to(device) for item in batch]
-
-            optimizer.zero_grad()
-
-            with autocast(device.type):
-                output = model.forward(grids, masks)[0]
-                loss = criterion(
-                    output.view(-1, model.num_classes),
-                    target_grid.view(-1).long(),
-                )
-
-            # Use the scaler for backpropagation and optimization
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            train_loss += loss.item()
-
-            predictions = torch.argmax(output, dim=-1)
-            train_accuracy += (predictions == target_grid).float().mean().item()
-
-        train_loss /= len(data_loader)
-        train_accuracy /= len(data_loader)
-
-        end_time = time.time()
-
-        print(f"Epoch {epoch+1}/{num_epochs}:")
-        print(f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
-
-        duration = end_time - start_time
-        print(f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)")
-
-        if train_accuracy >= 0.99:
-            print("Stopping early because accuracy exceeds 99%")
+        # If no new candidates, stop
+        if not new_trajectories:
             break
 
-    print("Fine-tuning completed")
-    return model
+        # Prune to top beam_width candidates
+        active_trajectories = sorted(
+            new_trajectories,
+            key=lambda x: calculate_trajectory_score(x),
+            reverse=True,
+        )[:beam_width]
+
+    return best_candidate.predictions
 
 
-def create_noisy_tgt(
-    tgt: torch.Tensor, noise_ratio: float, num_classes: int
-) -> torch.Tensor:
-    batch_size, grid_dim, grid_dim = tgt.shape
-    mask = torch.rand(batch_size, grid_dim, grid_dim, device=tgt.device) < noise_ratio
+def load_value_network_from_checkpoint(
+    filename: str,
+) -> tuple[ValueNetwork, ValueNetworkTrainState]:
+    checkpoint_dict = torch.load(filename, weights_only=False)
+    checkpoint = ValueNetworkTrainState(**checkpoint_dict)
 
-    noisy_target = tgt.clone()
-    noise_mask = ~mask
-    random_values = torch.randint(
-        0, num_classes, tgt.shape, device=tgt.device, dtype=tgt.dtype
-    )
-    noisy_target[noise_mask] = random_values[noise_mask]
-
-    return noisy_target
-
-
-def load_model_from_checkpoint(
-    model_filename: str,
-) -> tuple[ARCTransformer, ARCModelState]:
-    checkpoint_dict = torch.load(model_filename, weights_only=False)
-    checkpoint = ARCModelState(**checkpoint_dict)
-
-    if checkpoint.model_type == "vision":
-        model = ARCVisionEncoderDecoder(checkpoint.model_params)
-    elif checkpoint.model_type == "vision_encoder":
-        model = ARCVisionEncoder(checkpoint.model_params)
-    elif checkpoint.model_type == "encoder":
-        model = ARCTransformerEncoder(checkpoint.model_params)
-    else:
-        model = ARCTransformerEncoderDecoder(checkpoint.model_params)
+    value_network = ValueNetwork(checkpoint.model_params)
 
     if checkpoint.model_state_dict is not None:
-        model.load_state_dict(checkpoint.model_state_dict)
+        value_network.load_state_dict(checkpoint.model_state_dict)
 
-    return model, checkpoint
+    return value_network, checkpoint
 
 
-def train_arc_transformer(
-    model_filename: str,
+def train_arc_rl(
+    value_network_filename: str,
     num_epochs: int,
     patience: int = 10,
-    train_params: Optional[ARCTrainParams] = None,
-    force_compile: bool = False,
+    train_params: Optional[ValueNetworkTrainParams] = None,
     local_rank: Optional[int] = None,
 ) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    use_compilation = force_compile or device.type == "cuda"
 
     use_distributed = torch.cuda.device_count() > 0 and local_rank is not None
     local_rank = local_rank if use_distributed else 0
@@ -244,51 +227,42 @@ def train_arc_transformer(
 
     torch.backends.mha.set_fastpath_enabled(False)
 
-    model, checkpoint = load_model_from_checkpoint(model_filename)
-    model = model.to(device)
+    value_network, checkpoint = load_value_network_from_checkpoint(
+        value_network_filename
+    )
 
-    if use_compilation:
-        try:
-            model = torch.compile(model, mode="default")
-            print("Successfully compiled model")
-        except Exception as e:
-            print(
-                f"Warning: Model compilation failed, falling back to eager mode. Error: {str(e)}"
-            )
+    value_network = value_network.to(device)
 
     if use_distributed:
         from torch.nn.parallel import DistributedDataParallel
 
-        model = DistributedDataParallel(
-            model, device_ids=[local_rank], find_unused_parameters=True
+        value_network = DistributedDataParallel(
+            value_network, device_ids=[local_rank], find_unused_parameters=True
         )
         print(f"Using DistributedDataParallel on GPU {local_rank}", flush=True)
     else:
         print(f"Using single {'GPU' if device.type == 'cuda' else 'CPU'}")
 
-    compiled_model = model
-
-    base_model = model.module if hasattr(model, "module") else model
-    base_model = (
-        base_model._orig_mod if hasattr(base_model, "_orig_mod") else base_model
-    )
-    shapes = {
-        "grid_dim": base_model.grid_dim,
-        "num_train_pairs": base_model.num_train_pairs,
-        "num_classes": base_model.num_classes,
-    }
-
-    dataset_params = ARCDatasetParams(
-        max_grid_size=shapes["grid_dim"],
-        max_train_grids=shapes["num_train_pairs"],
-        color_offset=1,
+    base_value_network = (
+        value_network.module if hasattr(value_network, "module") else value_network
     )
 
     train_params = train_params or checkpoint.train_params
 
-    train_dataset, val_dataset = make_datasets(train_params.dataset_dir, dataset_params)
+    model, model_checkpoint = load_model_from_checkpoint(train_params.model_filename)
+    model = model.to(device)
 
-    dataset_dir_names = ", ".join(train_params.dataset_dir)
+    dataset_params = ARCDatasetParams(
+        max_grid_size=model.grid_dim,
+        max_train_grids=model.num_train_pairs,
+        color_offset=1,
+    )
+
+    train_dataset, val_dataset = make_datasets(
+        train_params.dataset_dirs, dataset_params
+    )
+
+    dataset_dir_names = ", ".join(train_params.dataset_dirs)
 
     print(
         f"Starting training run with dataset of {len(train_dataset)} training items and {len(val_dataset)} evaluation items: {dataset_dir_names}",
@@ -337,16 +311,18 @@ def train_arc_transformer(
         persistent_workers=True,
     )
 
-    class_weights = torch.ones(shapes["num_classes"]).to(device)
-    if train_params.loss_class_weights is not None:
-        for cls, weight in train_params.loss_class_weights.items():
-            class_weights[cls] = weight
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    # class_weights = torch.ones(model.num_classes).to(device)
+    # if train_params.loss_class_weights is not None:
+    #     for cls, weight in train_params.loss_class_weights.items():
+    #         class_weights[cls] = weight
+    # model_criterion = nn.CrossEntropyLoss(weight=class_weights)
+
+    value_network_criterion = nn.MSELoss()
 
     epoch = len(checkpoint.epochs)
 
     optimizer = optim.AdamW(
-        compiled_model.parameters(),
+        value_network.parameters(),
         lr=train_params.learning_rate,
         weight_decay=train_params.weight_decay,
     )
@@ -379,32 +355,23 @@ def train_arc_transformer(
         else:
             plateau_scheduler.step(loss)
 
-    def forward_pass(
-        model: nn.Module,
-        grids: torch.Tensor,
-        masks: torch.Tensor,
-        tgt: Optional[torch.Tensor] = None,
-    ):
-        output = model.forward(grids, masks, tgt=tgt)
-        return output[0] if isinstance(output, tuple) else output
-
     def training_step(
-        model: nn.Module,
         grids: torch.Tensor,
         masks: torch.Tensor,
         target_grid: torch.Tensor,
     ):
-        do_refinement = (
-            train_params.refinement_ratio is not None
-            and random.random() < train_params.refinement_ratio
+        output = search_and_predict(
+            model,
+            value_network,
+            grids,
+            masks,
+            target_grid,
+            train_params.search_params.temperatures,
+            output=None,
+            beam_width=train_params.search_params.beam_width,
+            max_depth=train_params.search_params.max_depth,
+            num_samples_per_temperature=train_params.search_params.num_samples_per_temperature,
         )
-        if do_refinement:
-            refinement_noise_ratio = random.uniform(0.0, 0.6)
-            tgt = create_noisy_tgt(
-                target_grid, refinement_noise_ratio, shapes["num_classes"]
-            )
-        else:
-            tgt = None
         with autocast(device.type):
             output = forward_pass(model, grids, masks, tgt=tgt)
             loss = criterion(
@@ -443,15 +410,15 @@ def train_arc_transformer(
         return output, loss, accuracy
 
     def save_checkpoint():
-        torch.save(checkpoint.__dict__, model_filename)
-        print("Saved checkpoint", model_filename, flush=True)
+        torch.save(checkpoint.__dict__, value_network_filename)
+        print("Saved checkpoint", value_network_filename, flush=True)
 
     total_epochs = epoch + num_epochs
     epochs_without_improvement = 0
 
     for epoch in range(epoch, total_epochs):
         train_sampler.set_epoch(epoch)
-        compiled_model.train()
+        value_network.train()
         train_loss = 0.0
         train_accuracy = 0.0
         start_time = time.time()
@@ -571,26 +538,52 @@ def train_arc_transformer(
     print("Training completed")
 
 
-def train_on_mac(
-    model_name: str,
+def train_rl_local(
+    model_filename,
     num_epochs: int,
-    model_type: Optional[str] = "normal",
-    model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
-    train_params: Optional[ARCTrainParams] = None,
+    value_network_name: str,
+    model_params: Optional[ValueNetworkParams] = None,
+    train_params: Optional[ValueNetworkTrainParams] = None,
+    model_dir: str = "models/value_network",
 ):
-    model_filename = f"models/{model_name}.pth"
+    model, checkpoint = load_model_from_checkpoint(model_filename)
+    value_network_filename = f"{model_dir}/{value_network_name}.pth"
 
     if model_params is not None and train_params is not None:
-        print("Starting new model", model_name)
-        model_state = ARCModelState(
-            model_type=model_type,
-            model_state_dict=None,
+        print("Starting new value network", value_network_name)
+        value_network_state = ValueNetworkTrainState(
             model_params=model_params,
+            model_state_dict=None,
             train_params=train_params,
             optimizer_state_dict=None,
             epochs=[],
             best_val_loss=float("inf"),
         )
-        torch.save(model_state.__dict__, model_filename)
+        torch.save(value_network_state.__dict__, value_network_filename)
 
-    return train_arc_transformer(model_filename, num_epochs, train_params=train_params)
+    return train_arc_rl(value_network_filename, num_epochs, train_params=train_params)
+
+
+# def train_on_mac(
+#     model_name: str,
+#     num_epochs: int,
+#     model_type: Optional[str] = "normal",
+#     model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
+#     train_params: Optional[ARCTrainParams] = None,
+# ):
+#     model_filename = f"models/{model_name}.pth"
+
+#     if model_params is not None and train_params is not None:
+#         print("Starting new model", model_name)
+#         model_state = ARCModelState(
+#             model_type=model_type,
+#             model_state_dict=None,
+#             model_params=model_params,
+#             train_params=train_params,
+#             optimizer_state_dict=None,
+#             epochs=[],
+#             best_val_loss=float("inf"),
+#         )
+#         torch.save(model_state.__dict__, model_filename)
+
+#     return train_arc_transformer(model_filename, num_epochs, train_params=train_params)

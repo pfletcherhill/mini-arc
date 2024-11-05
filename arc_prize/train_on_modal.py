@@ -17,12 +17,14 @@ from arc_prize.model import (
     ARCTransformerEncoder,
     ARCTransformerEncoderDecoder,
     ARCTransformerEncoderDecoderParams,
+    ARCVisionEncoder,
     ARCVisionEncoderDecoder,
 )
 from arc_prize.train import (
     ARCModelState,
     ARCTrainParams,
     fine_tune_transformer,
+    load_model_from_checkpoint,
     train_arc_transformer,
 )
 
@@ -57,7 +59,7 @@ def train_process(
 
 
 @modal_app.function(
-    gpu="a100-80gb:2",
+    gpu="a100-80gb:4",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60 * 24),
 )
@@ -118,21 +120,14 @@ def evaluate_model(
     model_name: str,
     dataset_dir: list[str],
     need_attn_weights: bool = False,
+    temperature: list[float] = [0.0, 0.0],
     num_tasks: Optional[int] = None,
 ):
     model_filename = f"/vol/models/{model_name}.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = ARCModelState(**torch.load(model_filename, map_location=device))
 
-    if checkpoint.model_type == "vision":
-        model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
-    elif checkpoint.model_type == "encoder":
-        model = ARCTransformerEncoder(checkpoint.model_params).to(device)
-    else:
-        model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
-
-    if checkpoint.model_state_dict is not None:
-        model.load_state_dict(checkpoint.model_state_dict)
+    model, checkpoint = load_model_from_checkpoint(model_filename)
+    model = model.to(device)
 
     dataset_params = ARCDatasetParams(
         max_grid_size=model.grid_dim,
@@ -160,34 +155,36 @@ def evaluate_model(
             break
 
         grids, grid_masks, output_grid = [item.to(device) for item in batch]
-        (
-            predictions,
-            encoder_attn_weights,
-            decoder_sa_weights,
-            decoder_mha_weights,
-        ) = model.generate(grids, grid_masks, need_attn_weights)
-        if encoder_attn_weights is not None:
-            print("encoder_attn_weights", encoder_attn_weights.shape)
-        if decoder_sa_weights is not None:
-            print("decoder_sa_weights", decoder_sa_weights.shape)
-        if decoder_mha_weights is not None:
-            print("decoder_mha_weights", decoder_mha_weights.shape)
+        predictions = model.generate(
+            grids, grid_masks, tgt=None, temperature=temperature[0]
+        )[0]
+
+        refined_predictions = model.generate(
+            grids, grid_masks, tgt=predictions, temperature=temperature[1]
+        )[0]
+        # if encoder_attn_weights is not None:
+        #     print("encoder_attn_weights", encoder_attn_weights.shape)
+        # if decoder_sa_weights is not None:
+        #     print("decoder_sa_weights", decoder_sa_weights.shape)
+        # if decoder_mha_weights is not None:
+        #     print("decoder_mha_weights", decoder_mha_weights.shape)
         output.append(
             {
                 "grids": grids.cpu().numpy(),
                 "output_grid": output_grid.cpu().numpy(),
                 "predictions": predictions.cpu().numpy(),
-                "encoder_attn_weights": encoder_attn_weights.mean(dim=-2).cpu().numpy()
-                if encoder_attn_weights is not None
-                else None,
-                "decoder_sa_attn_weights": decoder_sa_weights.mean(dim=-2).cpu().numpy()
-                if decoder_sa_weights is not None
-                else None,
-                "decoder_mha_attn_weights": decoder_mha_weights.mean(dim=-2)
-                .cpu()
-                .numpy()
-                if decoder_mha_weights is not None
-                else None,
+                "refined_predictions": refined_predictions.cpu().numpy(),
+                # "encoder_attn_weights": encoder_attn_weights.mean(dim=-2).cpu().numpy()
+                # if encoder_attn_weights is not None
+                # else None,
+                # "decoder_sa_attn_weights": decoder_sa_weights.mean(dim=-2).cpu().numpy()
+                # if decoder_sa_weights is not None
+                # else None,
+                # "decoder_mha_attn_weights": decoder_mha_weights.mean(dim=-2)
+                # .cpu()
+                # .numpy()
+                # if decoder_mha_weights is not None
+                # else None,
             }
         )
 
@@ -200,7 +197,10 @@ def evaluate_model(
     timeout=(60 * 60),
 )
 def finetune_and_predict(
-    model_name: str, dataset_dir: list[str], num_tasks: Optional[int] = None
+    model_name: str,
+    dataset_dir: list[str],
+    num_finetune_epochs: int = 2,
+    num_tasks: Optional[int] = None,
 ):
     model_filename = f"/vol/models/{model_name}.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -214,6 +214,8 @@ def finetune_and_predict(
         model = ARCVisionEncoderDecoder(checkpoint.model_params).to(device)
     elif checkpoint.model_type == "encoder":
         model = ARCTransformerEncoder(checkpoint.model_params).to(device)
+    elif checkpoint.model_type == "vision_encoder":
+        model = ARCVisionEncoder(checkpoint.model_params).to(device)
     else:
         model = ARCTransformerEncoderDecoder(checkpoint.model_params).to(device)
 
@@ -255,7 +257,9 @@ def finetune_and_predict(
             task["grids"].to(device).unsqueeze(0), dataset_params
         )
 
-        finetune_model = fine_tune_transformer(model, train_params, finetune_dataset)
+        finetune_model = fine_tune_transformer(
+            model, train_params, finetune_dataset, num_finetune_epochs
+        )
 
         finetune_predictions = finetune_model.generate(
             task["grids"].to(device).unsqueeze(0),
