@@ -284,6 +284,7 @@ def train_arc_transformer(
         color_offset=1,
     )
 
+    new_train_params = train_params is not None
     train_params = train_params or checkpoint.train_params
 
     train_dataset, val_dataset = make_datasets(train_params.dataset_dir, dataset_params)
@@ -350,7 +351,7 @@ def train_arc_transformer(
         lr=train_params.learning_rate,
         weight_decay=train_params.weight_decay,
     )
-    if checkpoint.optimizer_state_dict is not None:
+    if checkpoint.optimizer_state_dict is not None and new_train_params is False:
         optimizer.load_state_dict(checkpoint.optimizer_state_dict)
 
     scaler = GradScaler(device.type)
