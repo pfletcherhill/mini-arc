@@ -28,7 +28,7 @@ from arc_prize.train import (
     train_arc_transformer,
 )
 
-modal_image = modal.Image.debian_slim().pip_install("torch")
+modal_image = modal.Image.debian_slim().pip_install(["torch", "psutil"])
 modal_app = modal.App(name="arc-prize", image=modal_image)
 
 
@@ -122,6 +122,7 @@ def evaluate_model(
     need_attn_weights: bool = False,
     temperature: list[float] = [0.0, 0.0],
     num_tasks: Optional[int] = None,
+    chunked: bool = False,
 ):
     model_filename = f"/vol/models/{model_name}.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -134,17 +135,10 @@ def evaluate_model(
         max_train_grids=model.num_train_pairs,
         color_offset=1,
     )
-    # dataset_dir = f"/vol/data/{checkpoint.train_params.dataset_name}"
+
     _, val_loader = make_data_loaders(
-        dataset_dir,
-        batch_size=1,
-        params=dataset_params,
+        dataset_dir, batch_size=1, params=dataset_params, chunked=chunked
     )
-    # _, val_loader = make_re_arc_data_loaders(
-    #     dataset_dir,
-    #     batch_size=1,
-    #     params=dataset_params,
-    # )
 
     model.eval()
 

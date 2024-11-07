@@ -1,18 +1,19 @@
 import itertools
 import json
 import math
+import os
 import random
 from dataclasses import dataclass
-from operator import itemgetter
+from pathlib import Path
 from typing import Callable, Iterator, Optional
 
+import numpy as np
 import torch
 from torch.utils.data import (
     ConcatDataset,
     DataLoader,
     Dataset,
     DistributedSampler,
-    Sampler,
     Subset,
     random_split,
 )
@@ -220,6 +221,73 @@ class ARCDataset(Dataset):
         }
 
 
+class ChunkedARCDataset(Dataset):
+    def __init__(self, data_dir: str, config: ARCDatasetParams):
+        self.data_dir = Path(data_dir)
+        self.config = config
+
+        with open(self.data_dir / "metadata.json", "r") as f:
+            metadata = json.load(f)
+            self.chunk_size = metadata["chunk_size"]
+            self.num_tasks = metadata["num_tasks"]
+
+    def __len__(self) -> int:
+        return self.num_tasks
+
+    def __getitem__(self, idx: int) -> dict:
+        # Compute chunk index and offset
+        chunk_idx = idx // self.chunk_size
+        offset = idx % self.chunk_size
+
+        # Load with memory mapping
+        chunk_data = np.load(
+            self.data_dir / f"chunk_{chunk_idx:04d}.npy", allow_pickle=True
+        )
+        train_data, test_input, test_output = chunk_data[offset]
+
+        # Process grids
+        grids = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.int,
+        )
+        masks = torch.zeros(
+            2 * self.config.max_train_grids + 1,
+            self.config.max_grid_size,
+            self.config.max_grid_size,
+            dtype=torch.bool,
+        )
+
+        for i, pair in enumerate(train_data):
+            if i >= self.config.max_train_grids:
+                raise Exception(
+                    "Training pairs exceed max", i, self.config.max_train_grids
+                )
+            input_grid, input_mask = pad_and_mask_grid(pair[0], self.config)
+            grids[2 * i] = input_grid
+            masks[2 * i] = input_mask
+            output_grid, output_mask = pad_and_mask_grid(pair[1], self.config)
+            grids[2 * i + 1] = output_grid
+            masks[2 * i + 1] = output_mask
+
+        test_input_grid, test_input_mask = pad_and_mask_grid(test_input, self.config)
+        grids[-1] = test_input_grid
+        masks[-1] = test_input_mask
+
+        test_output_grid = (
+            pad_and_mask_grid(test_output, self.config)[0]
+            if test_output is not None
+            else None
+        )
+
+        return {
+            "grids": grids,
+            "masks": masks,
+            "output": test_output_grid,
+        }
+
+
 class ARCKaggleDataset(Dataset):
     challenges: dict[str, dict]
     task_ids: list[str]
@@ -385,10 +453,40 @@ def make_datasets(
     return (train_dataset, val_dataset)
 
 
+def make_chunked_datasets(
+    dataset_dir: list[str], params: ARCDatasetParams
+) -> tuple[Dataset, Dataset]:
+    train_datasets = []
+    val_datasets = []
+
+    for dir in dataset_dir:
+        train_dataset = ChunkedARCDataset(
+            f"{dir}/training",
+            config=params,
+        )
+        train_datasets.append(train_dataset)
+        val_dataset = ChunkedARCDataset(
+            f"{dir}/evaluation",
+            config=params,
+        )
+        val_datasets.append(val_dataset)
+
+    train_dataset = ConcatDataset(train_datasets)
+    val_dataset = ConcatDataset(val_datasets)
+
+    return (train_dataset, val_dataset)
+
+
 def make_data_loaders(
-    dataset_dir: list[str], batch_size: int, params: ARCDatasetParams
+    dataset_dir: list[str],
+    batch_size: int,
+    params: ARCDatasetParams,
+    chunked: bool = False,
 ) -> tuple[DataLoader[ARCDataset], DataLoader[ARCDataset]]:
-    train_dataset, val_dataset = make_datasets(dataset_dir, params)
+    if chunked:
+        train_dataset, val_dataset = make_chunked_datasets(dataset_dir, params)
+    else:
+        train_dataset, val_dataset = make_datasets(dataset_dir, params)
 
     train_loader = DataLoader(
         train_dataset,
@@ -540,3 +638,64 @@ class DistributedRandomSampler(DistributedSampler):
 
     def __len__(self) -> int:
         return self.num_samples
+
+
+def convert_to_chunked_format(
+    challenges_file: str,
+    output_dir: str,
+    chunk_size: int = 100,
+    solutions_file: Optional[str] = None,
+):
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Load original data
+    with open(challenges_file, "r") as f:
+        challenges = json.load(f)
+    if solutions_file is not None:
+        with open(solutions_file, "r") as f:
+            solutions = json.load(f)
+    else:
+        solutions = {}
+
+    task_ids = list(challenges.keys())
+    num_tasks = len(task_ids)
+    num_chunks = (num_tasks + chunk_size - 1) // chunk_size
+
+    # Process in chunks
+    for chunk_idx in range(num_chunks):
+        start_idx = chunk_idx * chunk_size
+        chunk_task_ids = task_ids[start_idx : start_idx + chunk_size]
+        chunk_data = np.empty((len(chunk_task_ids), 3), dtype=object)
+
+        for i, task_id in enumerate(chunk_task_ids):
+            train_pairs = []
+            for pair in challenges[task_id]["train"]:
+                train_pairs.append(
+                    (
+                        np.array(pair["input"], dtype=np.uint8),
+                        np.array(pair["output"], dtype=np.uint8),
+                    )
+                )
+
+            test_input = np.array(
+                challenges[task_id]["test"][0]["input"], dtype=np.uint8
+            )
+            solution = (
+                np.array(solutions.get(task_id, [None])[0], dtype=np.uint8)
+                if task_id in solutions
+                else None
+            )
+
+            chunk_data[i] = [train_pairs, test_input, solution]
+
+        # Save as single numpy array
+        chunk_name = f"chunk_{chunk_idx:04d}"
+        np.save(f"{output_dir}/{chunk_name}.npy", chunk_data)
+
+    metadata = {
+        "num_chunks": (num_tasks + chunk_size - 1) // chunk_size,
+        "chunk_size": chunk_size,
+        "num_tasks": num_tasks,
+    }
+    with open(f"{output_dir}/metadata.json", "w") as f:
+        json.dump(metadata, f)

@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+import psutil
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -17,7 +18,7 @@ from arc_prize.data import (
     DistributedRandomSampler,
     FinetuneDataset,
     collate_arc_fn,
-    make_datasets,
+    make_chunked_datasets,
 )
 from arc_prize.model import (
     ARCTransformerEncoder,
@@ -97,6 +98,23 @@ def calculate_param_norm(model: ARCTransformerEncoderDecoder):
         param_norm = p.data.norm(2)
         total_norm += param_norm.item() ** 2
     return total_norm**0.5
+
+
+def print_memory_stats():
+    # GPU memory
+    if torch.cuda.is_available():
+        print(
+            f"GPU Memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB",
+            flush=True,
+        )
+        print(
+            f"GPU Memory cached: {torch.cuda.memory_reserved() / 1e9:.2f} GB",
+            flush=True,
+        )
+
+    # CPU memory
+    process = psutil.Process()
+    print(f"CPU Memory used: {process.memory_info().rss / 1e9:.2f} GB", flush=True)
 
 
 def fine_tune_transformer(
@@ -284,10 +302,12 @@ def train_arc_transformer(
         color_offset=1,
     )
 
-    new_train_params = train_params is not None
+    reset_lr = train_params is not None
     train_params = train_params or checkpoint.train_params
 
-    train_dataset, val_dataset = make_datasets(train_params.dataset_dir, dataset_params)
+    train_dataset, val_dataset = make_chunked_datasets(
+        train_params.dataset_dir, dataset_params
+    )
 
     dataset_dir_names = ", ".join(train_params.dataset_dir)
 
@@ -323,19 +343,17 @@ def train_arc_transformer(
         train_dataset,
         batch_size=train_params.batch_size,
         sampler=train_sampler,
-        num_workers=4,
+        num_workers=2,
         collate_fn=collate_arc_fn,
         pin_memory=True,
-        persistent_workers=True,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=train_params.batch_size,
         sampler=val_sampler,
-        num_workers=4,
+        num_workers=2,
         collate_fn=collate_arc_fn,
         pin_memory=True,
-        persistent_workers=True,
     )
 
     class_weights = torch.ones(shapes["num_classes"]).to(device)
@@ -351,8 +369,11 @@ def train_arc_transformer(
         lr=train_params.learning_rate,
         weight_decay=train_params.weight_decay,
     )
-    if checkpoint.optimizer_state_dict is not None and new_train_params is False:
+    if checkpoint.optimizer_state_dict is not None and reset_lr is False:
         optimizer.load_state_dict(checkpoint.optimizer_state_dict)
+    elif epoch > 0:
+        for param_group in optimizer.param_groups:
+            param_group["initial_lr"] = train_params.learning_rate
 
     scaler = GradScaler(device.type)
 
