@@ -19,16 +19,17 @@
   frame=single
 }
 
+\begin{document}
+
 \title{Mini-ARC: Solving Abstraction and Reasoning Puzzles with Small
 Transformer Models}
 
 \author{Paul Fletcher-Hill}
-
-\begin{document}
+\date{November 12, 2024}
 
 \maketitle
 
-\begin{figure*}[t!]
+\begin{figure*}[h!]
   \centering
   \includegraphics[width=\textwidth]{figures/header.png}
   \caption{Mini-ARC solves ARC puzzles using customized small
@@ -252,10 +253,10 @@ The dataset is a combination of three sources:
 
 \begin{figure*}[h!]
   \centering
-  \includegraphics[width=\textwidth]{figures/prompt.png}
+  \includegraphics[width=\textwidth]{figures/html.png}
   \caption{ARC-HTML is a prompting strategy for getting LLMs to
-  generate HTML documents with scrapeable ARC puzzles.}
-  \label{fig:top-image}
+  generate HTML documents where each page load yields a new ARC puzzle.}
+  \label{fig:html}
 \end{figure*}
 
 In addition to the RE-ARC and BARC puzzles, I wanted to generate
@@ -423,6 +424,7 @@ mentally without having to write Python programs to try them—but it
 is still a disadvantage relative to other approaches.
 
 \subsection{Future Work and Other Ideas}
+\subsubsection{Scale Up Models to Larger Grids}
 The current Mini-ARC models are constrained by their 12x12 grid size
 requirement. In the future, I would like to train larger models with
 the same architecture to evaluate against larger ARC puzzles. While
@@ -434,6 +436,19 @@ which would require a much larger model.
 For comparison, the current context window for OpenAI's GPT-3.5 is
 16,385 tokens.
 
+\subsubsection{ARC-HTML Experimentation}
+The ARC-HTML approach demonstrated that advanced LLMs are capable of
+formalizing ARC puzzles in HTML, CSS, and Javascript documents.
+In addition to prompting LLMs to follow instructions for specific
+puzzles, we should try prompting them to generate HTML documents for
+new puzzles entirely. This strategy is similar to BARC\cite{barc},
+which cleverly prompted LLMs to generate new puzzles from seed
+programs, where the seed programs represented a diverse set of grid
+transformations. But since ARC-HTML puzzles are HTML documents, in
+order to get an even more diverse dataset, we could prompt LLMs to
+modify ARC-HTML puzzles using all possible CSS transformations.
+
+\subsubsection{Meta Learning}
 Since test-time training has proven to be effective, future work
 should be done to evaluate meta learning strategies\cite{maml}.
 Currently, training and test-time training occur independently, but
@@ -519,22 +534,22 @@ these 10 puzzles.
   \caption{Mini-ARC Data Leakage Puzzle Performance}
   \begin{tabular}{lccc}
     \toprule
-    \textbf{Metric} & \textbf{Mini-ARC-12} &
-    \textbf{Mini-ARC-v12} \\
+    \textbf{\footnotesize{Metric}} & \textbf{\footnotesize{Mini-ARC-12}} &
+    \textbf{\footnotesize{Mini-ARC-v12}} \\
     \midrule
-    Zero-shot Score & 3 (30.0\%) & 2 (20.0\%)  \\
-    Zero-shot Accuracy & 93.0\% & 91.1\%  \\
-    Zero-shot Closeness & 5 (50.0\%) & 3 (30.0\%)  \\
+    \small{Zero-shot Score} & 3 (30.0\%) & 2 (20.0\%)  \\
+    \small{Zero-shot Accuracy} & 93.0\% & 91.1\%  \\
+    \small{Zero-shot Closeness} & 5 (50.0\%) & 3 (30.0\%)  \\
     \addlinespace
     \cmidrule{1-3}
-    TTT Score & 4 (40.0\%) & 3 (30.0\%)  \\
-    TTT Accuracy & 91.2\% & 94.7\%  \\
-    TTT Closeness & 5 (50.0\%) & 5 (50.0\%) \\
+    \small{TTT Score} & 4 (40.0\%) & 3 (30.0\%)  \\
+    \small{TTT Accuracy} & 91.2\% & 94.7\%  \\
+    \small{TTT Closeness} & 5 (50.0\%) & 5 (50.0\%) \\
     \addlinespace
     \cmidrule{1-3}
-    TTT + Refined Score  & 4 (40.0\%) & 3 (30.0\%)  \\
-    TTT + Refined Accuracy  & 91.7\% & 94.9\%  \\
-    TTT + Refined Closeness  & 5 (50.0\%) & 5 (50.0\%)  \\
+    \small{TTT + Refined Score} & 4 (40.0\%) & 3 (30.0\%)  \\
+    \small{TTT + Refined Accuracy} & 91.7\% & 94.9\%  \\
+    \small{TTT + Refined Closeness} & 5 (50.0\%) & 5 (50.0\%)  \\
     \bottomrule
   \end{tabular}
   \label{tab:leakage-performance}
