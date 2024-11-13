@@ -90,6 +90,7 @@ class EncoderWithAttention(nn.TransformerEncoder):
         mask: Optional[torch.Tensor] = None,
         src_key_padding_mask: Optional[torch.Tensor] = None,
         need_weights: bool = False,
+        need_intermediate_outputs: bool = False,
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
@@ -110,6 +111,7 @@ class EncoderWithAttention(nn.TransformerEncoder):
 
         output = src
         attn_weights = []
+        intermediate_outputs = []
 
         for mod in self.layers:
             output, layer_attn_weights = mod(
@@ -120,11 +122,20 @@ class EncoderWithAttention(nn.TransformerEncoder):
             )
             if need_weights:
                 attn_weights.append(layer_attn_weights)
+            if need_intermediate_outputs:
+                intermediate_outputs.append(output)
 
         if self.norm is not None:
             output = self.norm(output)
 
-        return output, (torch.stack(attn_weights, dim=1) if need_weights else None)
+        secondary = None
+        if need_weights:
+            secondary = torch.stack(attn_weights, dim=1)
+        elif need_intermediate_outputs:
+            secondary = torch.stack(intermediate_outputs, dim=1)
+
+        return output, secondary
+        # return output, (torch.stack(attn_weights, dim=1) if need_weights else None)
 
 
 class DecoderLayerWithAttention(nn.TransformerDecoderLayer):
@@ -324,7 +335,12 @@ class ARCTransformerEncoderDecoder(nn.Module):
         self.output_layer = nn.Linear(self.d_model, self.num_classes)
 
     def forward(
-        self, src: torch.Tensor, src_mask: torch.Tensor, need_weights: bool = False
+        self,
+        src: torch.Tensor,
+        src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
+        need_weights: bool = False,
     ) -> tuple[
         torch.Tensor,
         Optional[torch.Tensor],
@@ -346,7 +362,12 @@ class ARCTransformerEncoderDecoder(nn.Module):
             src, src_key_padding_mask=padding_mask, need_weights=need_weights
         )
 
-        output_query = self.output_query.expand(batch_size, -1, -1)
+        if tgt is not None:
+            output_query = self.embedding.forward(tgt).view(
+                batch_size, -1, self.d_model
+            )
+        else:
+            output_query = self.output_query.expand(batch_size, -1, -1)
 
         (
             output,
@@ -363,6 +384,9 @@ class ARCTransformerEncoderDecoder(nn.Module):
 
         output = output.view(batch_size, self.grid_dim, self.grid_dim, self.num_classes)
 
+        if temperature > 0:
+            output = output / temperature
+
         return (
             output,
             encoder_attn_weights,
@@ -374,6 +398,8 @@ class ARCTransformerEncoderDecoder(nn.Module):
         self,
         src: torch.Tensor,
         src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
         need_weights: bool = False,
     ) -> tuple[
         torch.Tensor,
@@ -387,13 +413,24 @@ class ARCTransformerEncoderDecoder(nn.Module):
                 encoder_attn_weights,
                 decoder_sa_attn_weights,
                 decoder_mha_attn_weights,
-            ) = self.forward(src, src_mask, need_weights)
-            return (
-                torch.argmax(output, dim=-1),
-                encoder_attn_weights,
-                decoder_sa_attn_weights,
-                decoder_mha_attn_weights,
-            )
+            ) = self.forward(src, src_mask, tgt=tgt, temperature=temperature)
+
+        if temperature > 0:
+            probs = torch.softmax(output, dim=-1)
+            prediction = torch.multinomial(
+                probs.view(-1, probs.size(-1)),
+                num_samples=1,
+                replacement=True,
+            ).view(-1, *probs.size()[:-1])
+        else:
+            prediction = torch.argmax(output, dim=-1)
+
+        return (
+            prediction,
+            encoder_attn_weights,
+            decoder_sa_attn_weights,
+            decoder_mha_attn_weights,
+        )
 
 
 class ARCTransformerEncoder(nn.Module):
@@ -451,6 +488,8 @@ class ARCTransformerEncoder(nn.Module):
         src_mask: torch.Tensor,
         tgt: Optional[torch.Tensor] = None,
         temperature: float = 0.0,
+        need_intermediate_outputs: bool = False,
+        need_weights: bool = False,
     ) -> tuple[
         torch.Tensor,
         Optional[torch.Tensor],
@@ -493,9 +532,13 @@ class ARCTransformerEncoder(nn.Module):
             dim=1,
         )
 
-        output = self.encoder.forward(
-            embedded, mask=causal_mask, src_key_padding_mask=padding_mask
-        )[0]
+        output, secondary = self.encoder.forward(
+            embedded,
+            mask=causal_mask,
+            src_key_padding_mask=padding_mask,
+            need_weights=need_weights,
+            need_intermediate_outputs=need_intermediate_outputs,
+        )
 
         # Get only the output grid portion
         output_grid_portion = output[:, -self.output_seq_len :, :]
@@ -509,12 +552,14 @@ class ARCTransformerEncoder(nn.Module):
         if temperature > 0:
             output = output / temperature
 
-        return (output, None, None, None)
+        return (output, secondary, None, None)
 
     def generate(
         self,
         src: torch.Tensor,
         src_mask: torch.Tensor,
+        tgt: Optional[torch.Tensor] = None,
+        temperature: float = 0.0,
         need_weights: bool = False,
     ) -> tuple[
         torch.Tensor,
@@ -528,13 +573,24 @@ class ARCTransformerEncoder(nn.Module):
                 encoder_attn_weights,
                 decoder_sa_attn_weights,
                 decoder_mha_attn_weights,
-            ) = self.forward(src, src_mask)
-            return (
-                torch.argmax(output, dim=-1),
-                encoder_attn_weights,
-                decoder_sa_attn_weights,
-                decoder_mha_attn_weights,
-            )
+            ) = self.forward(src, src_mask, tgt=tgt, temperature=temperature)
+
+        if temperature > 0:
+            probs = torch.softmax(output, dim=-1)
+            prediction = torch.multinomial(
+                probs.view(-1, probs.size(-1)),
+                num_samples=1,
+                replacement=True,
+            ).view(-1, *probs.size()[:-1])
+        else:
+            prediction = torch.argmax(output, dim=-1)
+
+        return (
+            prediction,
+            encoder_attn_weights,
+            decoder_sa_attn_weights,
+            decoder_mha_attn_weights,
+        )
 
 
 class PatchEmbedding(nn.Module):

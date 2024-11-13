@@ -59,11 +59,143 @@ def train_process(
 
 
 @modal_app.function(
-    gpu="a100-80gb:4",
+    gpu="a100:2",
     volumes={"/vol/models": models_volume, "/vol/data": data_volume},
     timeout=(60 * 60 * 24),
 )
 def train(
+    model_name: str,
+    num_epochs: int,
+    model_type: Optional[str] = "normal",
+    model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
+    train_params: Optional[ARCTrainParams] = None,
+):
+    model_filename = f"/vol/models/{model_name}.pth"
+
+    if model_params is not None and train_params is not None:
+        print("Starting new model", model_name)
+        model_state = ARCModelState(
+            model_type=model_type,
+            model_state_dict=None,
+            model_params=model_params,
+            train_params=train_params,
+            optimizer_state_dict=None,
+            epochs=[],
+            best_val_loss=float("inf"),
+        )
+        torch.save(model_state.__dict__, model_filename)
+
+    world_size = torch.cuda.device_count()
+    print(f"Starting distributed training across {world_size} GPUs")
+
+    port = 12355
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(port)
+
+    print(f"Using port {port} for distributed training")
+
+    return spawn(
+        train_process,
+        args=(world_size, model_filename, num_epochs, train_params),
+        nprocs=world_size,
+        join=True,
+    )
+
+
+@modal_app.function(
+    gpu="a100:3",
+    volumes={"/vol/models": models_volume, "/vol/data": data_volume},
+    timeout=(60 * 60 * 24),
+)
+def train_3(
+    model_name: str,
+    num_epochs: int,
+    model_type: Optional[str] = "normal",
+    model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
+    train_params: Optional[ARCTrainParams] = None,
+):
+    model_filename = f"/vol/models/{model_name}.pth"
+
+    if model_params is not None and train_params is not None:
+        print("Starting new model", model_name)
+        model_state = ARCModelState(
+            model_type=model_type,
+            model_state_dict=None,
+            model_params=model_params,
+            train_params=train_params,
+            optimizer_state_dict=None,
+            epochs=[],
+            best_val_loss=float("inf"),
+        )
+        torch.save(model_state.__dict__, model_filename)
+
+    world_size = torch.cuda.device_count()
+    print(f"Starting distributed training across {world_size} GPUs")
+
+    port = 12355
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(port)
+
+    print(f"Using port {port} for distributed training")
+
+    return spawn(
+        train_process,
+        args=(world_size, model_filename, num_epochs, train_params),
+        nprocs=world_size,
+        join=True,
+    )
+
+
+@modal_app.function(
+    gpu="a100:4",
+    volumes={"/vol/models": models_volume, "/vol/data": data_volume},
+    timeout=(60 * 60 * 24),
+)
+def train_4(
+    model_name: str,
+    num_epochs: int,
+    model_type: Optional[str] = "normal",
+    model_params: Optional[ARCTransformerEncoderDecoderParams] = None,
+    train_params: Optional[ARCTrainParams] = None,
+):
+    model_filename = f"/vol/models/{model_name}.pth"
+
+    if model_params is not None and train_params is not None:
+        print("Starting new model", model_name)
+        model_state = ARCModelState(
+            model_type=model_type,
+            model_state_dict=None,
+            model_params=model_params,
+            train_params=train_params,
+            optimizer_state_dict=None,
+            epochs=[],
+            best_val_loss=float("inf"),
+        )
+        torch.save(model_state.__dict__, model_filename)
+
+    world_size = torch.cuda.device_count()
+    print(f"Starting distributed training across {world_size} GPUs")
+
+    port = 12355
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(port)
+
+    print(f"Using port {port} for distributed training")
+
+    return spawn(
+        train_process,
+        args=(world_size, model_filename, num_epochs, train_params),
+        nprocs=world_size,
+        join=True,
+    )
+
+
+@modal_app.function(
+    gpu="a100-80gb:4",
+    volumes={"/vol/models": models_volume, "/vol/data": data_volume},
+    timeout=(60 * 60 * 24),
+)
+def train_80gb(
     model_name: str,
     num_epochs: int,
     model_type: Optional[str] = "normal",

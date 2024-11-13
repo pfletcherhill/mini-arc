@@ -119,9 +119,10 @@ def print_memory_stats():
 
 def fine_tune_transformer(
     model: nn.Module,
-    train_params: ARCTrainParams,
+    finetune_params: ARCTrainParams,
     dataset: FinetuneDataset,
     num_epochs: int,
+    accuracy_cutoff: float = 0.99,
 ) -> nn.Module:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -134,7 +135,7 @@ def fine_tune_transformer(
 
     data_loader = DataLoader(
         dataset,
-        batch_size=batch_size,
+        batch_size=finetune_params.batch_size,
         shuffle=True,
         collate_fn=collate_arc_fn,
         num_workers=0,
@@ -144,16 +145,16 @@ def fine_tune_transformer(
     print(f"Using batch size of {batch_size}")
 
     class_weights = torch.ones(model.num_classes).to(device)
-    if train_params.loss_class_weights is not None:
-        for cls, weight in train_params.loss_class_weights.items():
+    if finetune_params.loss_class_weights is not None:
+        for cls, weight in finetune_params.loss_class_weights.items():
             class_weights[cls] = weight
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=1e-5,
-        weight_decay=train_params.weight_decay,
+        lr=finetune_params.learning_rate,
+        weight_decay=finetune_params.weight_decay,
     )
 
     scaler = GradScaler(device.type)
@@ -198,8 +199,8 @@ def fine_tune_transformer(
         duration = end_time - start_time
         print(f"Epoch duration: {duration:.2f}s ({(duration / 60):.2f}m)")
 
-        if train_accuracy >= 0.99:
-            print("Stopping early because accuracy exceeds 99%")
+        if train_accuracy >= accuracy_cutoff:
+            print("Stopping early because accuracy exceeds accuracy cut-off")
             break
 
     print("Fine-tuning completed")
@@ -251,14 +252,16 @@ def train_arc_transformer(
     force_compile: bool = False,
     local_rank: Optional[int] = None,
 ) -> None:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    use_compilation = force_compile or device.type == "cuda"
-
     use_distributed = torch.cuda.device_count() > 0 and local_rank is not None
-    local_rank = local_rank if use_distributed else 0
 
-    if torch.cuda.is_available():
+    if use_distributed:
+        device = torch.device(f"cuda:{local_rank}")
         torch.cuda.set_device(local_rank)
+    else:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        local_rank = 0
+
+    use_compilation = force_compile or device.type == "cuda"
 
     torch.backends.mha.set_fastpath_enabled(False)
 
@@ -454,6 +457,7 @@ def train_arc_transformer(
             )
         else:
             tgt = None
+
         with autocast(device.type):
             output = forward_pass(model, grids, masks, tgt=tgt)
             loss = criterion(
